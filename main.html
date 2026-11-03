@@ -2,565 +2,844 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ORBIT — your personal planner, productivity and expense hub.">
+  <title>ORBIT | Your Personal Hub</title>
 
-    <title>ORBIT | Your Personal Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <meta name="description" content="ORBIT - Your personal space for tasks, subscriptions and bills.">
-
-    <link rel="stylesheet" href="style.css">
-
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 
 <body>
 
 <div class="app-shell">
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
 
-        <div class="brand">
-            <div class="brand-icon">
-                <i data-lucide="orbit"></i>
+    <a class="brand" href="#overview" aria-label="ORBIT home" data-page-link="overview">
+      <span class="brand-mark">
+        <i data-lucide="orbit"></i>
+      </span>
+      <span>
+        <strong>ORBIT</strong>
+        <small>Your personal hub</small>
+      </span>
+    </a>
+
+    <p class="sidebar-label">WORKSPACE</p>
+
+    <nav class="navigation" aria-label="Main navigation">
+
+      <button class="nav-link active" data-page="overview">
+        <i data-lucide="layout-dashboard"></i>
+        <span>Overview</span>
+      </button>
+
+      <button class="nav-link" data-page="planner">
+        <i data-lucide="calendar-days"></i>
+        <span>Planner</span>
+      </button>
+
+      <button class="nav-link" data-page="tasks">
+        <i data-lucide="list-checks"></i>
+        <span>To-do List</span>
+      </button>
+
+      <button class="nav-link" data-page="subscriptions">
+        <i data-lucide="repeat"></i>
+        <span>Subscriptions</span>
+      </button>
+
+      <button class="nav-link" data-page="bills">
+        <i data-lucide="receipt"></i>
+        <span>Bills</span>
+      </button>
+
+      <button class="nav-link" data-page="focus">
+        <i data-lucide="timer"></i>
+        <span>Focus Mode</span>
+      </button>
+
+    </nav>
+
+    <div class="sidebar-bottom">
+
+      <div class="sidebar-note">
+        <span class="note-icon">
+          <i data-lucide="sparkles"></i>
+        </span>
+
+        <strong>Small steps count.</strong>
+        <p>Make today a little more organised than yesterday.</p>
+      </div>
+
+      <div class="sidebar-status">
+        <span class="status-dot"></span>
+        <span id="connectionStatus">Checking your workspace…</span>
+      </div>
+
+    </div>
+
+  </aside>
+
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+
+      <div class="page-heading">
+        <p class="eyebrow">YOUR PERSONAL SPACE</p>
+        <h1 id="pageTitle">Overview</h1>
+        <p id="pageSubtitle">Everything you need, all in one place.</p>
+      </div>
+
+      <div class="topbar-actions">
+
+        <div class="search-wrap">
+          <i data-lucide="search"></i>
+
+          <input
+            id="globalSearch"
+            type="search"
+            placeholder="Search ORBIT…"
+            autocomplete="off"
+            aria-label="Search tasks, bills and subscriptions"
+          >
+
+          <div id="searchResults" class="search-results hidden"></div>
+        </div>
+
+        <button class="primary-button" id="quickAddButton">
+          <i data-lucide="plus"></i>
+          <span>Quick Add</span>
+        </button>
+
+        <div class="today-pill">
+          <i data-lucide="calendar"></i>
+          <span id="todayLabel"></span>
+        </div>
+
+      </div>
+
+    </header>
+
+
+    <!-- =========================
+         OVERVIEW
+    ========================== -->
+
+    <section class="page-view active" id="view-overview">
+
+      <!-- Welcome banner -->
+      <section class="welcome-banner">
+
+        <div class="welcome-copy">
+          <span class="welcome-tag">WELCOME TO YOUR SPACE</span>
+
+          <h2>
+            Everything in your life<br>
+            revolves around one hub.
+          </h2>
+
+          <p>
+            Plan your days, stay on top of your payments
+            and make time for what matters.
+          </p>
+
+          <button class="primary-button light-button" data-go-page="planner">
+            Open my planner
+            <i data-lucide="arrow-up-right"></i>
+          </button>
+        </div>
+
+        <div class="orbit-art" aria-hidden="true">
+          <span class="orbit-line orbit-line-one"></span>
+          <span class="orbit-line orbit-line-two"></span>
+          <span class="orbit-line orbit-line-three"></span>
+
+          <span class="orbit-core">O</span>
+
+          <span class="orbit-point point-one"></span>
+          <span class="orbit-point point-two"></span>
+          <span class="orbit-point point-three"></span>
+        </div>
+
+      </section>
+
+
+      <!-- STATISTICS -->
+      <div class="stats-grid">
+
+        <article class="stat-card stat-lavender">
+          <div class="stat-top">
+            <span class="stat-icon">
+              <i data-lucide="list-checks"></i>
+            </span>
+            <span class="stat-label">TASKS LEFT</span>
+          </div>
+
+          <h2 id="statOpenTasks">0</h2>
+          <p>Still to be completed</p>
+        </article>
+
+
+        <article class="stat-card stat-pink">
+          <div class="stat-top">
+            <span class="stat-icon">
+              <i data-lucide="check-circle-2"></i>
+            </span>
+            <span class="stat-label">COMPLETED</span>
+          </div>
+
+          <h2 id="statCompleted">0</h2>
+          <p id="taskProgressText">Your progress this time</p>
+        </article>
+
+
+        <article class="stat-card stat-blue">
+          <div class="stat-top">
+            <span class="stat-icon">
+              <i data-lucide="wallet"></i>
+            </span>
+            <span class="stat-label">MONTHLY COMMITMENTS</span>
+          </div>
+
+          <h2 id="statMonthlyCost">₹0</h2>
+          <p>Estimated subscriptions + bills</p>
+        </article>
+
+
+        <article class="stat-card stat-green">
+          <div class="stat-top">
+            <span class="stat-icon">
+              <i data-lucide="timer"></i>
+            </span>
+            <span class="stat-label">FOCUS SESSIONS</span>
+          </div>
+
+          <h2 id="statFocusSessions">0</h2>
+          <p>Sessions completed today</p>
+        </article>
+
+      </div>
+
+
+      <!-- REMINDERS -->
+      <div class="dashboard-grid">
+
+        <article class="content-card">
+
+          <div class="section-heading">
+            <div>
+              <h3>Today's reminders</h3>
+              <p>What needs your attention?</p>
+            </div>
+
+            <button class="text-button" data-go-page="planner">
+              Open planner
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+
+          <div id="todayReminders" class="preview-list"></div>
+
+        </article>
+
+
+        <article class="content-card">
+
+          <div class="section-heading">
+            <div>
+              <h3>Coming up next</h3>
+              <p>Your next seven days at a glance.</p>
+            </div>
+
+            <button class="text-button" data-go-page="planner">
+              View calendar
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+
+          <div id="upcomingReminders" class="preview-list"></div>
+
+        </article>
+
+      </div>
+
+
+      <!-- TASKS AND EXPENSES -->
+      <div class="dashboard-grid lower-grid">
+
+        <article class="content-card">
+
+          <div class="section-heading">
+            <div>
+              <h3>My tasks</h3>
+              <p>A little progress every day.</p>
+            </div>
+
+            <button class="text-button" data-go-page="tasks">
+              View all
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+
+          <div id="overviewTasks" class="preview-list"></div>
+
+        </article>
+
+
+        <article class="content-card expense-card">
+
+          <div class="section-heading">
+            <div>
+              <h3>Monthly expense snapshot</h3>
+              <p>A simple view of your commitments.</p>
+            </div>
+
+            <i data-lucide="chart-no-axes-column" class="muted-icon"></i>
+          </div>
+
+          <div class="expense-total" id="expenseTotal">₹0</div>
+
+          <div class="expense-breakdown">
+
+            <div>
+              <span class="expense-dot lavender-dot"></span>
+              <span>Monthly subscription estimate</span>
+              <strong id="subscriptionEstimate">₹0</strong>
             </div>
 
             <div>
-                <h2>ORBIT</h2>
-                <p>Your personal hub</p>
+              <span class="expense-dot pink-dot"></span>
+              <span>Unpaid bills due this month</span>
+              <strong id="unpaidBillsTotal">₹0</strong>
             </div>
+
+          </div>
+
+          <button class="text-button" data-go-page="bills">
+            Manage expenses
+            <i data-lucide="arrow-right"></i>
+          </button>
+
+        </article>
+
+      </div>
+
+
+      <!-- QUICK ACCESS -->
+      <div class="quick-access-section">
+
+        <div class="section-heading">
+          <div>
+            <h3>Quick access</h3>
+            <p>Jump straight into your workspace.</p>
+          </div>
         </div>
 
-        <p class="sidebar-label">WORKSPACE</p>
+        <div class="quick-grid">
 
-        <nav class="navigation">
+          <button class="quick-card quick-purple" data-go-page="planner">
+            <i data-lucide="calendar-days"></i>
+            <span>Open planner</span>
+            <i data-lucide="arrow-up-right" class="quick-arrow"></i>
+          </button>
 
-            <button class="nav-link active" data-page="overview">
-                <i data-lucide="layout-dashboard"></i>
-                <span>Overview</span>
-            </button>
+          <button class="quick-card quick-pink" data-go-page="tasks">
+            <i data-lucide="list-checks"></i>
+            <span>Manage tasks</span>
+            <i data-lucide="arrow-up-right" class="quick-arrow"></i>
+          </button>
 
-            <button class="nav-link" data-page="tasks">
-                <i data-lucide="check-square"></i>
-                <span>My Tasks</span>
-            </button>
+          <button class="quick-card quick-blue" data-go-page="focus">
+            <i data-lucide="timer"></i>
+            <span>Start focusing</span>
+            <i data-lucide="arrow-up-right" class="quick-arrow"></i>
+          </button>
 
-            <button class="nav-link" data-page="subscriptions">
-                <i data-lucide="repeat"></i>
-                <span>Subscriptions</span>
-            </button>
+          <button class="quick-card quick-green" data-go-page="bills">
+            <i data-lucide="receipt"></i>
+            <span>Track bills</span>
+            <i data-lucide="arrow-up-right" class="quick-arrow"></i>
+          </button>
 
-            <button class="nav-link" data-page="bills">
-                <i data-lucide="receipt"></i>
-                <span>Bills</span>
-            </button>
-
-            <button class="nav-link" data-page="calendar">
-                <i data-lucide="calendar-days"></i>
-                <span>Calendar</span>
-            </button>
-
-        </nav>
-
-        <div class="sidebar-bottom">
-            <div class="sidebar-note">
-                <div class="note-icon">
-                    <i data-lucide="sparkles"></i>
-                </div>
-
-                <p>A little organisation goes a long way.</p>
-            </div>
-
-            <div class="sidebar-footer">
-                <span class="status-dot"></span>
-                Your space is ready
-            </div>
         </div>
 
-    </aside>
+      </div>
+
+    </section>
 
 
-    <!-- MAIN CONTENT -->
-    <main class="main-content">
+    <!-- =========================
+         PLANNER
+    ========================== -->
 
-        <!-- TOP BAR -->
-        <header class="topbar">
+    <section class="page-view" id="view-planner">
 
-            <div class="page-heading">
-                <p class="eyebrow">YOUR PERSONAL SPACE</p>
-                <h1 id="pageTitle">Overview</h1>
-                <p id="pageSubtitle">Everything you need, all in one place.</p>
+      <div class="planner-layout">
+
+        <article class="content-card planner-card">
+
+          <div class="planner-toolbar">
+
+            <div>
+              <h3 id="plannerMonthTitle">Month Year</h3>
+              <p>Tasks and payments, all in one calendar.</p>
             </div>
 
-            <div class="topbar-right">
-                <div class="date-display">
-                    <i data-lucide="calendar"></i>
-                    <span id="todayLabel"></span>
-                </div>
+            <div class="calendar-controls">
 
-                <div class="profile-circle">O</div>
-            </div>
+              <button class="icon-button" id="previousMonth" aria-label="Previous month">
+                <i data-lucide="chevron-left"></i>
+              </button>
 
-        </header>
+              <button class="secondary-button today-button" id="goToday">
+                Today
+              </button>
 
-
-        <!-- ========================= -->
-        <!-- OVERVIEW PAGE -->
-        <!-- ========================= -->
-
-        <section class="page-view active" id="view-overview">
-
-            <!-- Welcome Banner -->
-            <div class="welcome-banner">
-
-                <div class="welcome-content">
-                    <span class="welcome-tag">WELCOME TO YOUR SPACE</span>
-
-                    <h2>Everything in your life<br>revolves around one hub.</h2>
-
-                    <p>
-                        Stay organised, keep track of your spending,
-                        and make room for what matters.
-                    </p>
-
-                    <button class="primary-button light-button" data-go-page="tasks">
-                        Explore my tasks
-                        <i data-lucide="arrow-up-right"></i>
-                    </button>
-                </div>
-
-                <div class="orbit-decoration">
-                    <div class="orbit-ring ring-one"></div>
-                    <div class="orbit-ring ring-two"></div>
-                    <div class="orbit-ring ring-three"></div>
-                    <div class="orbit-center">O</div>
-                    <div class="orbit-dot dot-one"></div>
-                    <div class="orbit-dot dot-two"></div>
-                    <div class="orbit-dot dot-three"></div>
-                </div>
+              <button class="icon-button" id="nextMonth" aria-label="Next month">
+                <i data-lucide="chevron-right"></i>
+              </button>
 
             </div>
 
+          </div>
 
-            <!-- STATISTICS -->
-            <div class="stats-grid">
+          <div class="calendar-weekdays">
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+            <span>Sun</span>
+          </div>
 
-                <div class="stat-card stat-lavender">
-                    <div class="stat-top">
-                        <div class="stat-icon">
-                            <i data-lucide="list-checks"></i>
-                        </div>
-                        <span class="stat-label">TASKS LEFT</span>
-                    </div>
+          <div id="calendarGrid" class="calendar-grid"></div>
 
-                    <h2 id="statOpenTasks">0</h2>
-                    <p>Things to get done</p>
-                </div>
+          <div class="calendar-legend">
+            <span><i class="legend-dot task-legend"></i>Tasks</span>
+            <span><i class="legend-dot bill-legend"></i>Bills</span>
+            <span><i class="legend-dot sub-legend"></i>Renewals</span>
+          </div>
 
-
-                <div class="stat-card stat-pink">
-                    <div class="stat-top">
-                        <div class="stat-icon">
-                            <i data-lucide="repeat"></i>
-                        </div>
-                        <span class="stat-label">SUBSCRIPTIONS</span>
-                    </div>
-
-                    <h2 id="statSubscriptions">0</h2>
-                    <p>Active subscriptions</p>
-                </div>
+        </article>
 
 
-                <div class="stat-card stat-blue">
-                    <div class="stat-top">
-                        <div class="stat-icon">
-                            <i data-lucide="wallet"></i>
-                        </div>
-                        <span class="stat-label">MONTHLY COST</span>
-                    </div>
+        <aside class="content-card selected-day-card">
 
-                    <h2 id="statMonthlySpend">₹0</h2>
-                    <p>Estimated subscription cost</p>
-                </div>
+          <div class="section-heading">
 
+            <div>
+              <p class="eyebrow">YOUR SCHEDULE</p>
+              <h3 id="selectedDateTitle">Selected day</h3>
             </div>
 
+            <button class="icon-button" id="addTaskForSelectedDate" aria-label="Add task for selected date">
+              <i data-lucide="plus"></i>
+            </button>
 
-            <!-- DASHBOARD CONTENT -->
-            <div class="dashboard-grid">
+          </div>
 
-                <div class="content-card">
+          <p class="selected-day-subtitle" id="selectedDateSubtitle">
+            Choose a date to see its schedule.
+          </p>
 
-                    <div class="section-heading">
-                        <div>
-                            <h3>Upcoming tasks</h3>
-                            <p>A little progress every day.</p>
-                        </div>
+          <div id="selectedDayItems" class="selected-day-list"></div>
 
-                        <button class="text-button" data-go-page="tasks">
-                            View all
-                            <i data-lucide="arrow-right"></i>
-                        </button>
-                    </div>
+        </aside>
 
-                    <div id="overviewTasks" class="preview-list"></div>
+      </div>
 
-                </div>
+    </section>
 
 
-                <div class="content-card">
+    <!-- =========================
+         TO-DO LIST
+    ========================== -->
 
-                    <div class="section-heading">
-                        <div>
-                            <h3>Upcoming payments</h3>
-                            <p>Keep your payments in check.</p>
-                        </div>
+    <section class="page-view" id="view-tasks">
 
-                        <button class="text-button" data-go-page="bills">
-                            View all
-                            <i data-lucide="arrow-right"></i>
-                        </button>
-                    </div>
+      <article class="content-card page-card">
 
-                    <div id="overviewPayments" class="preview-list"></div>
+        <div class="section-heading">
 
-                </div>
+          <div>
+            <h3>Your to-do list</h3>
+            <p>Break things down and keep moving forward.</p>
+          </div>
 
+          <button class="primary-button" id="showTaskForm">
+            <i data-lucide="plus"></i>
+            Add task
+          </button>
+
+        </div>
+
+
+        <form id="taskForm" class="entry-form hidden">
+
+          <input type="hidden" id="taskEditId">
+
+          <h4 id="taskFormTitle">Create a new task</h4>
+
+          <div class="form-grid">
+
+            <div class="form-group full-width">
+              <label for="taskName">Task name</label>
+              <input id="taskName" type="text" maxlength="120" placeholder="What do you need to do?" required>
             </div>
 
-
-            <!-- QUICK ACCESS -->
-            <div class="quick-access-section">
-
-                <div class="section-heading">
-                    <div>
-                        <h3>Quick access</h3>
-                        <p>Jump straight into your workspace.</p>
-                    </div>
-                </div>
-
-                <div class="quick-grid">
-
-                    <button class="quick-card quick-purple" data-go-page="tasks">
-                        <i data-lucide="check-circle-2"></i>
-                        <span>Manage tasks</span>
-                        <i data-lucide="arrow-up-right" class="quick-arrow"></i>
-                    </button>
-
-                    <button class="quick-card quick-pink" data-go-page="subscriptions">
-                        <i data-lucide="repeat"></i>
-                        <span>Subscriptions</span>
-                        <i data-lucide="arrow-up-right" class="quick-arrow"></i>
-                    </button>
-
-                    <button class="quick-card quick-blue" data-go-page="bills">
-                        <i data-lucide="receipt"></i>
-                        <span>Track bills</span>
-                        <i data-lucide="arrow-up-right" class="quick-arrow"></i>
-                    </button>
-
-                    <button class="quick-card quick-green" data-go-page="calendar">
-                        <i data-lucide="calendar-days"></i>
-                        <span>Open calendar</span>
-                        <i data-lucide="arrow-up-right" class="quick-arrow"></i>
-                    </button>
-
-                </div>
-
+            <div class="form-group">
+              <label for="taskDate">Due date</label>
+              <input id="taskDate" type="date">
             </div>
 
-        </section>
-
-
-
-        <!-- ========================= -->
-        <!-- TASKS PAGE -->
-        <!-- ========================= -->
-
-        <section class="page-view" id="view-tasks">
-
-            <div class="content-card page-card">
-
-                <div class="section-heading">
-                    <div>
-                        <h3>Your task list</h3>
-                        <p>Plan your day and get things done.</p>
-                    </div>
-
-                    <button class="primary-button" id="showTaskForm">
-                        <i data-lucide="plus"></i>
-                        Add task
-                    </button>
-                </div>
-
-
-                <!-- ADD TASK FORM -->
-                <form id="taskForm" class="entry-form hidden">
-
-                    <input type="hidden" id="taskEditId">
-
-                    <h4 id="taskFormTitle">Create a new task</h4>
-
-                    <div class="form-grid">
-
-                        <div class="form-group full-width">
-                            <label for="taskName">Task name</label>
-                            <input
-                                type="text"
-                                id="taskName"
-                                placeholder="What do you need to do?"
-                                required
-                            >
-                        </div>
-
-                        <div class="form-group">
-                            <label for="taskDate">Due date</label>
-                            <input type="date" id="taskDate">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="taskPriority">Priority</label>
-                            <select id="taskPriority">
-                                <option value="low">Low</option>
-                                <option value="medium" selected>Medium</option>
-                                <option value="high">High</option>
-                            </select>
-                        </div>
-
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="primary-button" id="taskSubmit">
-                            Save task
-                        </button>
-
-                        <button type="button" class="secondary-button" id="cancelTaskEdit">
-                            Cancel
-                        </button>
-                    </div>
-
-                </form>
-
-
-                <div id="taskList" class="item-list"></div>
-
+            <div class="form-group">
+              <label for="taskPriority">Priority</label>
+              <select id="taskPriority">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
             </div>
 
-        </section>
-
-
-
-        <!-- ========================= -->
-        <!-- SUBSCRIPTIONS PAGE -->
-        <!-- ========================= -->
-
-        <section class="page-view" id="view-subscriptions">
-
-            <div class="content-card page-card">
-
-                <div class="section-heading">
-                    <div>
-                        <h3>Your subscriptions</h3>
-                        <p>Keep track of your recurring expenses.</p>
-                    </div>
-
-                    <button class="primary-button" id="showSubscriptionForm">
-                        <i data-lucide="plus"></i>
-                        Add subscription
-                    </button>
-                </div>
-
-
-                <!-- ADD SUBSCRIPTION FORM -->
-                <form id="subscriptionForm" class="entry-form hidden">
-
-                    <input type="hidden" id="subscriptionEditId">
-
-                    <h4 id="subscriptionFormTitle">Add a subscription</h4>
-
-                    <div class="form-grid">
-
-                        <div class="form-group full-width">
-                            <label for="subscriptionName">Service name</label>
-                            <input
-                                type="text"
-                                id="subscriptionName"
-                                placeholder="e.g. Spotify, Netflix"
-                                required
-                            >
-                        </div>
-
-                        <div class="form-group">
-                            <label for="subscriptionAmount">Amount (₹)</label>
-                            <input
-                                type="number"
-                                id="subscriptionAmount"
-                                min="0"
-                                step="0.01"
-                                placeholder="499"
-                                required
-                            >
-                        </div>
-
-                        <div class="form-group">
-                            <label for="subscriptionCycle">Billing cycle</label>
-                            <select id="subscriptionCycle">
-                                <option value="monthly">Monthly</option>
-                                <option value="yearly">Yearly</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label for="subscriptionDate">Next renewal date</label>
-                            <input type="date" id="subscriptionDate" required>
-                        </div>
-
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="primary-button" id="subscriptionSubmit">
-                            Save subscription
-                        </button>
-
-                        <button type="button" class="secondary-button" id="cancelSubscriptionEdit">
-                            Cancel
-                        </button>
-                    </div>
-
-                </form>
-
-
-                <div id="subscriptionList" class="item-list"></div>
-
+            <div class="form-group">
+              <label for="taskCategory">Category</label>
+              <select id="taskCategory">
+                <option value="Study">Study</option>
+                <option value="Personal">Personal</option>
+                <option value="Work">Work</option>
+                <option value="Other" selected>Other</option>
+              </select>
             </div>
 
-        </section>
+          </div>
+
+          <div class="form-actions">
+
+            <button class="primary-button" type="submit" id="taskSubmit">
+              Save task
+            </button>
+
+            <button class="secondary-button" type="button" id="cancelTask">
+              Cancel
+            </button>
+
+          </div>
+
+        </form>
 
 
-
-        <!-- ========================= -->
-        <!-- BILLS PAGE -->
-        <!-- ========================= -->
-
-        <section class="page-view" id="view-bills">
-
-            <div class="content-card page-card">
-
-                <div class="section-heading">
-                    <div>
-                        <h3>Your bills</h3>
-                        <p>Never lose track of a payment.</p>
-                    </div>
-
-                    <button class="primary-button" id="showBillForm">
-                        <i data-lucide="plus"></i>
-                        Add bill
-                    </button>
-                </div>
+        <div class="filter-row" role="group" aria-label="Filter tasks">
+          <button class="filter-button active" data-task-filter="all">All</button>
+          <button class="filter-button" data-task-filter="pending">Pending</button>
+          <button class="filter-button" data-task-filter="completed">Completed</button>
+          <button class="filter-button" data-task-filter="overdue">Overdue</button>
+        </div>
 
 
-                <!-- ADD BILL FORM -->
-                <form id="billForm" class="entry-form hidden">
+        <div class="task-progress-line">
+          <div class="progress-track">
+            <span id="taskProgressBar"></span>
+          </div>
+          <span id="taskProgressLabel">0% complete</span>
+        </div>
 
-                    <input type="hidden" id="billEditId">
+        <div id="taskList" class="item-list"></div>
 
-                    <h4 id="billFormTitle">Add a new bill</h4>
+      </article>
 
-                    <div class="form-grid">
-
-                        <div class="form-group full-width">
-                            <label for="billName">Bill name</label>
-                            <input
-                                type="text"
-                                id="billName"
-                                placeholder="e.g. Electricity, Wi-Fi"
-                                required
-                            >
-                        </div>
-
-                        <div class="form-group">
-                            <label for="billAmount">Amount (₹)</label>
-                            <input
-                                type="number"
-                                id="billAmount"
-                                min="0"
-                                step="0.01"
-                                placeholder="1200"
-                                required
-                            >
-                        </div>
-
-                        <div class="form-group">
-                            <label for="billDate">Due date</label>
-                            <input type="date" id="billDate" required>
-                        </div>
-
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="primary-button" id="billSubmit">
-                            Save bill
-                        </button>
-
-                        <button type="button" class="secondary-button" id="cancelBillEdit">
-                            Cancel
-                        </button>
-                    </div>
-
-                </form>
+    </section>
 
 
-                <div id="billList" class="item-list"></div>
+    <!-- =========================
+         SUBSCRIPTIONS
+    ========================== -->
 
+    <section class="page-view" id="view-subscriptions">
+
+      <article class="content-card page-card">
+
+        <div class="section-heading">
+
+          <div>
+            <h3>Your subscriptions</h3>
+            <p>Keep track of recurring services and renewals.</p>
+          </div>
+
+          <button class="primary-button" id="showSubscriptionForm">
+            <i data-lucide="plus"></i>
+            Add subscription
+          </button>
+
+        </div>
+
+
+        <form id="subscriptionForm" class="entry-form hidden">
+
+          <input type="hidden" id="subscriptionEditId">
+
+          <h4 id="subscriptionFormTitle">Add a subscription</h4>
+
+          <div class="form-grid">
+
+            <div class="form-group full-width">
+              <label for="subscriptionName">Service name</label>
+              <input id="subscriptionName" type="text" maxlength="100" placeholder="e.g. Music or video service" required>
             </div>
 
-        </section>
-
-
-
-        <!-- ========================= -->
-        <!-- CALENDAR PAGE -->
-        <!-- ========================= -->
-
-        <section class="page-view" id="view-calendar">
-
-            <div class="content-card page-card">
-
-                <div class="section-heading">
-                    <div>
-                        <h3>Your upcoming schedule</h3>
-                        <p>Tasks, renewals and bills in one timeline.</p>
-                    </div>
-                </div>
-
-                <div id="calendarList" class="calendar-list"></div>
-
+            <div class="form-group">
+              <label for="subscriptionAmount">Amount (₹)</label>
+              <input id="subscriptionAmount" type="number" min="0" step="0.01" placeholder="499" required>
             </div>
 
-        </section>
+            <div class="form-group">
+              <label for="subscriptionCycle">Billing cycle</label>
+              <select id="subscriptionCycle">
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="subscriptionDate">Next renewal date</label>
+              <input id="subscriptionDate" type="date" required>
+            </div>
+
+          </div>
+
+          <div class="form-actions">
+
+            <button class="primary-button" type="submit" id="subscriptionSubmit">
+              Save subscription
+            </button>
+
+            <button class="secondary-button" type="button" id="cancelSubscription">
+              Cancel
+            </button>
+
+          </div>
+
+        </form>
+
+        <div id="subscriptionList" class="item-list"></div>
+
+      </article>
+
+    </section>
 
 
-        <!-- FOOTER -->
-        <footer class="main-footer">
-            <p>Made for a more organised everyday. <span>✦</span> ORBIT</p>
-            <p>Your information is saved in this browser.</p>
-        </footer>
+    <!-- =========================
+         BILLS
+    ========================== -->
 
-    </main>
+    <section class="page-view" id="view-bills">
+
+      <article class="content-card page-card">
+
+        <div class="section-heading">
+
+          <div>
+            <h3>Your bills</h3>
+            <p>Know what is due and what has been paid.</p>
+          </div>
+
+          <button class="primary-button" id="showBillForm">
+            <i data-lucide="plus"></i>
+            Add bill
+          </button>
+
+        </div>
+
+
+        <form id="billForm" class="entry-form hidden">
+
+          <input type="hidden" id="billEditId">
+
+          <h4 id="billFormTitle">Add a new bill</h4>
+
+          <div class="form-grid">
+
+            <div class="form-group full-width">
+              <label for="billName">Bill name</label>
+              <input id="billName" type="text" maxlength="100" placeholder="e.g. Electricity or internet" required>
+            </div>
+
+            <div class="form-group">
+              <label for="billAmount">Amount (₹)</label>
+              <input id="billAmount" type="number" min="0" step="0.01" placeholder="1200" required>
+            </div>
+
+            <div class="form-group">
+              <label for="billDate">Due date</label>
+              <input id="billDate" type="date" required>
+            </div>
+
+          </div>
+
+          <div class="form-actions">
+
+            <button class="primary-button" type="submit" id="billSubmit">
+              Save bill
+            </button>
+
+            <button class="secondary-button" type="button" id="cancelBill">
+              Cancel
+            </button>
+
+          </div>
+
+        </form>
+
+
+        <div class="bill-summary-strip">
+          <span><strong id="unpaidBillCount">0</strong> unpaid</span>
+          <span><strong id="paidBillCount">0</strong> paid</span>
+          <span><strong id="allBillsTotal">₹0</strong> total recorded</span>
+        </div>
+
+        <div id="billList" class="item-list"></div>
+
+      </article>
+
+    </section>
+
+
+    <!-- =========================
+         FOCUS MODE / POMODORO
+    ========================== -->
+
+    <section class="page-view" id="view-focus">
+
+      <div class="focus-layout">
+
+        <article class="content-card focus-card">
+
+          <span class="focus-kicker">
+            <i data-lucide="sparkles"></i>
+            MAKE SPACE FOR DEEP WORK
+          </span>
+
+          <h2>One thing at a time.</h2>
+
+          <p class="focus-intro">
+            Choose a session, settle in and give your attention to one task.
+          </p>
+
+
+          <div class="timer-mode-switch">
+
+            <button class="mode-button active" data-focus-mode="focus">
+              Focus · 25 min
+            </button>
+
+            <button class="mode-button" data-focus-mode="short">
+              Short break · 5 min
+            </button>
+
+            <button class="mode-button" data-focus-mode="long">
+              Long break · 15 min
+            </button>
+
+          </div>
+
+
+          <div class="timer-face">
+            <div class="timer-progress" id="timerProgress">
+
+              <div class="timer-inner">
+                <span id="timerModeLabel">FOCUS SESSION</span>
+                <strong id="timerDisplay">25:00</strong>
+                <small id="timerStatus">Ready when you are</small>
+              </div>
+
+            </div>
+          </div>
+
+
+          <div class="timer-controls">
+
+            <button class="primary-button timer-start" id="startPauseTimer">
+              <i data-lucide="play"></i>
+              <span>Start</span>
+            </button>
+
+            <button class="secondary-button" id="resetTimer">
+              <i data-lucide="rotate-ccw"></i>
+              Reset
+            </button>
+
+          </div>
+
+          <p class="timer-hint">
+            A focus session is counted when the timer reaches zero.
+          </p>
+
+        </article>
+
+
+        <aside class="focus-side-column">
+
+          <article class="content-card focus-count-card">
+
+            <span class="stat-icon">
+              <i data-lucide="target"></i>
+            </span>
+
+            <p class="mini-label">SESSIONS COMPLETED TODAY</p>
+
+            <strong id="focusTodayCount">0</strong>
+
+            <p>Every focused stretch adds up.</p>
+
+          </article>
+
+
+          <article class="content-card focus-tip-card">
+
+            <span class="stat-icon">
+              <i data-lucide="lightbulb"></i>
+            </span>
+
+            <h3>A tiny focus tip</h3>
+
+            <p>
+              Before you start, write down the one thing you want to finish.
+              Keep other tabs and distractions out of the way during your session.
+            </p>
+
+          </article>
+
+        </aside>
+
+      </div>
+
+    </section>
+
+
+    <!-- FOOTER -->
+    <footer class="main-footer">
+      <span>Made for a more organised everyday. <strong>✦ ORBIT</strong></span>
+      <span id="saveStatus">Your workspace</span>
+    </footer>
+
+  </main>
 
 </div>
 
 
-<!-- TOAST MESSAGE -->
-<div id="toast" class="toast"></div>
-
+<!-- TOAST NOTIFICATION -->
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="app.js"></script>
 

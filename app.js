@@ -1,1466 +1,2450 @@
 
-/* =========================
-   1. DATA STORAGE
-========================= */
+/* =========================================================
+   ORBIT — FRONTEND APPLICATION
+   Sends data to Express and saves it in data.json.
+   Also maintains a local browser backup.
+========================================================= */
 
-// Get saved information from the browser.
-// If nothing has been saved yet, start with empty lists.
+const STORAGE_KEYS = {
+  tasks: "orbit_tasks",
+  subscriptions: "orbit_subscriptions",
+  bills: "orbit_bills",
+  focus: "orbit_focus_today"
+};
 
-function loadData(key) {
-    try {
-        const savedData = localStorage.getItem(key);
-        return savedData ? JSON.parse(savedData) : [];
-    } catch (error) {
-        console.error("Could not load saved data:", error);
-        return [];
-    }
-}
+let tasks = [];
+let subscriptions = [];
+let bills = [];
 
-let tasks = loadData("orbit_tasks");
-let subscriptions = loadData("orbit_subscriptions");
-let bills = loadData("orbit_bills");
+let currentTaskFilter = "all";
+let selectedDate = dateKey(new Date());
 
+let plannerMonth = new Date(
+  new Date().getFullYear(),
+  new Date().getMonth(),
+  1
+);
 
-// Save information in the browser.
+let toastTimeout;
+let saveQueue = Promise.resolve();
 
-
-    
-async function saveData() {
-
-    const data = {
-        tasks: tasks,
-        subscriptions: subscriptions,
-        bills: bills
-    };
-
-    // Keep a browser backup as well
-    localStorage.setItem("orbit_tasks", JSON.stringify(tasks));
-    localStorage.setItem("orbit_subscriptions", JSON.stringify(subscriptions));
-    localStorage.setItem("orbit_bills", JSON.stringify(bills));
-
-    // Send the data to the backend
-    try {
-
-        const response = await fetch("/api/data", {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(data)
-        });
-
-        if (!response.ok) {
-            throw new Error("Backend could not save data");
-        }
-
-    } catch (error) {
-        console.error(error);
-        showToast("Could not connect to the backend.");
-    }
-}
-
-
-// Generate a unique ID for every entry.
-
-function createId() {
-    return Date.now().toString(36) +
-        Math.random().toString(36).slice(2, 8);
-}
-
-
-
-/* =========================
-   2. HELPER FUNCTIONS
-========================= */
-
-// Find an HTML element by its ID.
-
-function getElement(id) {
-    return document.getElementById(id);
-}
-
-
-// Format dates into a readable format.
-
-function formatDate(dateString) {
-    if (!dateString) {
-        return "No date set";
-    }
-
-    const date = new Date(dateString + "T00:00:00");
-
-    if (Number.isNaN(date.getTime())) {
-        return "Invalid date";
-    }
-
-    return date.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric"
-    });
-}
-
-
-// Get the day number and month from a date.
-
-function getDayAndMonth(dateString) {
-    const date = new Date(dateString + "T00:00:00");
-
-    return {
-        day: date.getDate(),
-        month: date.toLocaleDateString("en-IN", {
-            month: "short"
-        })
-    };
-}
-
-
-// Format amounts as Indian Rupees.
-
-function formatMoney(amount) {
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 2
-    }).format(Number(amount) || 0);
-}
-
-
-// Convert text into safe HTML before displaying it.
-
-function escapeHTML(value) {
-    return String(value).replace(/[&<>"']/g, function(character) {
-        const replacements = {
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#039;"
-        };
-
-        return replacements[character];
-    });
-}
-
-
-// Show a small notification message.
-
-let toastTimer;
-
-function showToast(message) {
-    const toast = getElement("toast");
-
-    toast.textContent = message;
-    toast.classList.add("show");
-
-    clearTimeout(toastTimer);
-
-    toastTimer = setTimeout(function() {
-        toast.classList.remove("show");
-    }, 2500);
-}
-
-
-// Refresh Lucide icons after creating new HTML.
-
-function refreshIcons() {
-    if (window.lucide) {
-        window.lucide.createIcons();
-    }
-}
-
-
-
-/* =========================
-   3. PAGE NAVIGATION
-========================= */
-
-const pageInformation = {
-    overview: {
-        title: "Overview",
-        subtitle: "Everything you need, all in one place."
-    },
-
-    tasks: {
-        title: "My Tasks",
-        subtitle: "Plan your day and keep moving forward."
-    },
-
-    subscriptions: {
-        title: "Subscriptions",
-        subtitle: "Keep your recurring expenses organised."
-    },
-
-    bills: {
-        title: "Bills",
-        subtitle: "Stay on top of your upcoming payments."
-    },
-
-    calendar: {
-        title: "Calendar",
-        subtitle: "Your tasks and payments, organised by date."
-    }
+const pageInfo = {
+  overview: {
+    title: "Overview",
+    subtitle: "Everything you need, all in one place."
+  },
+  planner: {
+    title: "Planner",
+    subtitle: "Your month, your tasks and your important dates."
+  },
+  tasks: {
+    title: "To-do List",
+    subtitle: "Plan your day and keep moving forward."
+  },
+  subscriptions: {
+    title: "Subscriptions",
+    subtitle: "Keep track of recurring services and renewals."
+  },
+  bills: {
+    title: "Bills",
+    subtitle: "Know what is due and what has been paid."
+  },
+  focus: {
+    title: "Focus Mode",
+    subtitle: "Make space for focused work and proper breaks."
+  }
 };
 
 
-// Open the selected page.
+// Shortcut for selecting HTML elements.
 
-function showPage(pageName) {
-
-    const page = getElement("view-" + pageName);
-
-    if (!page) {
-        return;
-    }
-
-    // Hide all pages.
-
-    document.querySelectorAll(".page-view").forEach(function(view) {
-        view.classList.remove("active");
-    });
-
-    // Show the selected page.
-
-    page.classList.add("active");
+const $ = (id) => document.getElementById(id);
 
 
-    // Update sidebar selection.
+// =========================================================
+// 1. DATE AND GENERAL HELPER FUNCTIONS
+// =========================================================
 
-    document.querySelectorAll(".nav-link").forEach(function(button) {
-        button.classList.toggle(
-            "active",
-            button.dataset.page === pageName
-        );
-    });
+function dateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
-
-    // Update page heading.
-
-    getElement("pageTitle").textContent =
-        pageInformation[pageName].title;
-
-    getElement("pageSubtitle").textContent =
-        pageInformation[pageName].subtitle;
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
+  return `${year}-${month}-${day}`;
 }
 
 
-// Navigation buttons.
+function parseDate(value) {
+  if (!value) return null;
 
-document.querySelectorAll(".nav-link").forEach(function(button) {
+  const parts = value.split("-").map(Number);
 
-    button.addEventListener("click", function() {
-        showPage(button.dataset.page);
-    });
+  if (parts.length !== 3 || parts.some(Number.isNaN)) {
+    return null;
+  }
 
-});
-
-
-// Buttons that take the user to another page.
-
-document.querySelectorAll("[data-go-page]").forEach(function(button) {
-
-    button.addEventListener("click", function() {
-        showPage(button.dataset.goPage);
-    });
-
-});
-
-
-
-/* =========================
-   4. FORM VISIBILITY
-========================= */
-
-function openForm(formId, inputId) {
-
-    const form = getElement(formId);
-
-    form.classList.remove("hidden");
-
-    if (inputId) {
-        getElement(inputId).focus();
-    }
+  return new Date(
+    parts[0],
+    parts[1] - 1,
+    parts[2],
+    12
+  );
 }
 
 
-function closeForm(formId) {
-    const form = getElement(formId);
+function dateDifference(value, reference = dateKey(new Date())) {
+  if (!value) return null;
 
-    form.reset();
-    form.classList.add("hidden");
+  const firstParts = value.split("-").map(Number);
+  const secondParts = reference.split("-").map(Number);
+
+  if (firstParts.length !== 3 || secondParts.length !== 3) {
+    return null;
+  }
+
+  const first = Date.UTC(
+    firstParts[0],
+    firstParts[1] - 1,
+    firstParts[2]
+  );
+
+  const second = Date.UTC(
+    secondParts[0],
+    secondParts[1] - 1,
+    secondParts[2]
+  );
+
+  return Math.round((first - second) / 86400000);
 }
 
 
+function formatDate(value, options = {}) {
+  const date = parseDate(value);
 
-/* =========================
-   5. TASK MANAGEMENT
-========================= */
+  if (!date) return "No date set";
 
-const taskForm = getElement("taskForm");
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    ...(options.year === false ? {} : { year: "numeric" })
+  });
+}
 
 
-// Display all tasks.
+function formatLongDate(value) {
+  const date = parseDate(value);
 
-function renderTasks() {
+  if (!date) return "Choose a date";
 
-    const taskList = getElement("taskList");
+  return date.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+}
 
-    if (tasks.length === 0) {
-        taskList.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">
-                    <i data-lucide="clipboard-list"></i>
-                </div>
 
-                <h4>No tasks yet</h4>
+function formatMoney(amount) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2
+  }).format(Number(amount) || 0);
+}
 
-                <p>Add your first task and start organising your day.</p>
-            </div>
-        `;
 
-        refreshIcons();
-        return;
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  })[character]);
+}
+
+
+function makeId() {
+  return (
+    Date.now().toString(36) +
+    Math.random().toString(36).slice(2, 8)
+  );
+}
+
+
+function refreshIcons() {
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+
+function showToast(message) {
+  const toast = $("toast");
+
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.classList.add("show");
+
+  clearTimeout(toastTimeout);
+
+  toastTimeout = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2600);
+}
+
+
+// =========================================================
+// 2. LOCAL STORAGE BACKUP
+// =========================================================
+
+function loadLocalBackup() {
+
+  const read = (key) => {
+
+    try {
+      const parsed = JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+
+      return Array.isArray(parsed) ? parsed : [];
+
+    } catch {
+      return [];
     }
 
+  };
 
-    // Put unfinished tasks before completed tasks.
+  return {
+    tasks: read(STORAGE_KEYS.tasks),
+    subscriptions: read(STORAGE_KEYS.subscriptions),
+    bills: read(STORAGE_KEYS.bills)
+  };
 
-    const sortedTasks = [...tasks].sort(function(a, b) {
+}
 
-        if (a.completed !== b.completed) {
-            return a.completed ? 1 : -1;
-        }
 
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
+function storeLocalBackup(data = {
+  tasks,
+  subscriptions,
+  bills
+}) {
 
-        return a.dueDate.localeCompare(b.dueDate);
+  localStorage.setItem(
+    STORAGE_KEYS.tasks,
+    JSON.stringify(data.tasks)
+  );
+
+  localStorage.setItem(
+    STORAGE_KEYS.subscriptions,
+    JSON.stringify(data.subscriptions)
+  );
+
+  localStorage.setItem(
+    STORAGE_KEYS.bills,
+    JSON.stringify(data.bills)
+  );
+
+}
+
+
+function updateConnectionStatus(isOnline, message) {
+
+  const dot = document.querySelector(".status-dot");
+
+  if (dot) {
+    dot.className = `status-dot ${isOnline ? "online" : "offline"}`;
+  }
+
+  if ($("connectionStatus")) {
+    $("connectionStatus").textContent = message;
+  }
+
+  if ($("saveStatus")) {
+    $("saveStatus").textContent = isOnline
+      ? "Saved to ORBIT data file"
+      : "Browser backup active";
+  }
+
+}
+
+
+// =========================================================
+// 3. BACKEND COMMUNICATION
+// =========================================================
+
+// Send all current records to the backend.
+
+async function saveData() {
+
+  const snapshot = {
+    tasks: [...tasks],
+    subscriptions: [...subscriptions],
+    bills: [...bills]
+  };
+
+  // Save a browser backup first.
+
+  storeLocalBackup(snapshot);
+
+  // Queue requests to avoid overlapping writes.
+
+  saveQueue = saveQueue.then(async () => {
+
+    const response = await fetch("/api/data", {
+      method: "PUT",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify(snapshot)
     });
 
+    if (!response.ok) {
+      throw new Error("The backend could not save the data.");
+    }
 
-    taskList.innerHTML = sortedTasks.map(function(task) {
+    updateConnectionStatus(
+      true,
+      "Connected to local backend"
+    );
 
-        const priority = task.priority || "medium";
+  }).catch((error) => {
 
-        return `
-            <article class="item-card ${task.completed ? "is-complete" : ""}">
+    console.error("Backend save failed:", error);
 
-                <button
-                    class="icon-button ${task.completed ? "complete-button" : ""}"
-                    data-action="toggle-task"
-                    data-id="${task.id}"
-                    aria-label="${task.completed ? "Mark incomplete" : "Mark complete"}"
-                    title="${task.completed ? "Mark incomplete" : "Mark complete"}"
-                >
-                    <i data-lucide="${task.completed ? "check" : "circle"}"></i>
-                </button>
+    updateConnectionStatus(
+      false,
+      "Browser backup active"
+    );
 
-                <div class="item-main">
+    showToast(
+      "Backend unavailable. Your browser backup was updated."
+    );
 
-                    <h4>${escapeHTML(task.title)}</h4>
+  });
 
-                    <p>
-                        ${task.dueDate ? "Due " + formatDate(task.dueDate) : "No due date"}
-                        <span class="priority priority-${priority}">
-                            ${priority.charAt(0).toUpperCase() + priority.slice(1)} priority
-                        </span>
-                    </p>
+  return saveQueue;
 
-                </div>
-
-                <div class="item-actions">
-
-                    <button
-                        class="icon-button"
-                        data-action="edit-task"
-                        data-id="${task.id}"
-                        aria-label="Edit task"
-                        title="Edit task"
-                    >
-                        <i data-lucide="pencil"></i>
-                    </button>
-
-                    <button
-                        class="icon-button delete-button"
-                        data-action="delete-task"
-                        data-id="${task.id}"
-                        aria-label="Delete task"
-                        title="Delete task"
-                    >
-                        <i data-lucide="trash-2"></i>
-                    </button>
-
-                </div>
-
-            </article>
-        `;
-
-    }).join("");
-
-
-    refreshIcons();
 }
 
 
-// Add a new task or update an existing one.
+// Load information from the backend.
 
-taskForm.addEventListener("submit", function(event) {
+async function loadData() {
 
-    event.preventDefault();
+  const localBackup = loadLocalBackup();
 
-    const editId = getElement("taskEditId").value;
+  try {
 
-    const taskData = {
-        title: getElement("taskName").value.trim(),
-        dueDate: getElement("taskDate").value,
-        priority: getElement("taskPriority").value
-    };
+    const response = await fetch("/api/data");
 
-
-    if (!taskData.title) {
-        showToast("Please enter a task name.");
-        return;
+    if (!response.ok) {
+      throw new Error("Could not load data from the backend.");
     }
 
+    const serverData = await response.json();
 
-    if (editId) {
+    const serverHasData = [
+      "tasks",
+      "subscriptions",
+      "bills"
+    ].some((key) => (
+      Array.isArray(serverData[key]) &&
+      serverData[key].length > 0
+    ));
 
-        const task = tasks.find(function(item) {
-            return item.id === editId;
-        });
+    const localHasData =
+      localBackup.tasks.length +
+      localBackup.subscriptions.length +
+      localBackup.bills.length > 0;
 
-        if (task) {
-            Object.assign(task, taskData);
-            showToast("Task updated successfully.");
-        }
+
+    if (serverHasData) {
+
+      tasks = Array.isArray(serverData.tasks)
+        ? serverData.tasks
+        : [];
+
+      subscriptions = Array.isArray(serverData.subscriptions)
+        ? serverData.subscriptions
+        : [];
+
+      bills = Array.isArray(serverData.bills)
+        ? serverData.bills
+        : [];
+
+    } else if (localHasData) {
+
+      // Migrate previous browser-only ORBIT information.
+
+      tasks = localBackup.tasks;
+      subscriptions = localBackup.subscriptions;
+      bills = localBackup.bills;
+
+      await saveData();
+
+      showToast(
+        "Your earlier ORBIT data has been moved to the backend."
+      );
 
     } else {
 
-        tasks.push({
-            id: createId(),
-            ...taskData,
-            completed: false
-        });
+      tasks = [];
+      subscriptions = [];
+      bills = [];
 
-        showToast("New task added.");
     }
 
+    storeLocalBackup();
 
-    saveData();
-    renderAll();
-    closeForm("taskForm");
+    updateConnectionStatus(
+      true,
+      "Connected to local backend"
+    );
 
-    getElement("taskSubmit").textContent = "Save task";
-    getElement("taskFormTitle").textContent = "Create a new task";
+  } catch (error) {
+
+    console.error("Backend load failed:", error);
+
+    tasks = localBackup.tasks;
+    subscriptions = localBackup.subscriptions;
+    bills = localBackup.bills;
+
+    updateConnectionStatus(
+      false,
+      "Browser backup active"
+    );
+
+    showToast(
+      "Could not reach the backend. Using your browser backup."
+    );
+
+  }
+
+}
+
+
+// =========================================================
+// 4. PAGE NAVIGATION
+// =========================================================
+
+function showPage(name) {
+
+  if (!pageInfo[name]) return;
+
+  document.querySelectorAll(".page-view").forEach((page) => {
+    page.classList.remove("active");
+  });
+
+  document.querySelectorAll(".nav-link").forEach((button) => {
+    button.classList.toggle(
+      "active",
+      button.dataset.page === name
+    );
+  });
+
+  $(`view-${name}`).classList.add("active");
+
+  $("pageTitle").textContent = pageInfo[name].title;
+  $("pageSubtitle").textContent = pageInfo[name].subtitle;
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+
+}
+
+
+// Sidebar navigation.
+
+document.querySelectorAll(".nav-link").forEach((button) => {
+
+  button.addEventListener("click", () => {
+    showPage(button.dataset.page);
+  });
 
 });
 
 
-// Edit a task.
+// Quick navigation buttons.
 
-function editTask(id) {
+document.querySelectorAll("[data-go-page]").forEach((button) => {
 
-    const task = tasks.find(function(item) {
-        return item.id === id;
-    });
+  button.addEventListener("click", () => {
+    showPage(button.dataset.goPage);
+  });
 
-    if (!task) return;
+});
 
-    showPage("tasks");
 
-    getElement("taskEditId").value = task.id;
-    getElement("taskName").value = task.title;
-    getElement("taskDate").value = task.dueDate || "";
-    getElement("taskPriority").value = task.priority || "medium";
+// ORBIT logo navigation.
 
-    getElement("taskFormTitle").textContent = "Edit your task";
-    getElement("taskSubmit").textContent = "Update task";
+document.querySelectorAll("[data-page-link]").forEach((button) => {
 
-    openForm("taskForm", "taskName");
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    showPage(button.dataset.pageLink);
+  });
 
-    getElement("taskForm").scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-    });
+});
+
+
+// =========================================================
+// 5. TASK MANAGEMENT
+// =========================================================
+
+function isTaskOverdue(task) {
+
+  return (
+    !task.completed &&
+    Boolean(task.dueDate) &&
+    task.dueDate < dateKey(new Date())
+  );
+
 }
 
 
-// Mark a task as completed or incomplete.
+// Open the task form.
 
-function toggleTask(id) {
+function openTaskForm(date = "") {
 
-    const task = tasks.find(function(item) {
-        return item.id === id;
+  $("taskForm").reset();
+
+  $("taskEditId").value = "";
+
+  $("taskFormTitle").textContent = "Create a new task";
+  $("taskSubmit").textContent = "Save task";
+
+  $("taskPriority").value = "medium";
+  $("taskCategory").value = "Other";
+
+  $("taskDate").value = date;
+
+  $("taskForm").classList.remove("hidden");
+
+  showPage("tasks");
+
+  $("taskName").focus();
+
+  $("taskForm").scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+}
+
+
+// Close a form.
+
+function closeForm(formId) {
+
+  $(formId).reset();
+  $(formId).classList.add("hidden");
+
+}
+
+
+// Display tasks.
+
+function renderTasks() {
+
+  const list = $("taskList");
+
+  const total = tasks.length;
+
+  const completed = tasks.filter(
+    (task) => task.completed
+  ).length;
+
+  const percentage = total
+    ? Math.round((completed / total) * 100)
+    : 0;
+
+
+  $("taskProgressBar").style.width = `${percentage}%`;
+
+  $("taskProgressLabel").textContent =
+    `${percentage}% complete · ${completed}/${total} tasks`;
+
+
+  let filtered = [...tasks];
+
+
+  if (currentTaskFilter === "pending") {
+    filtered = filtered.filter(
+      (task) => !task.completed
+    );
+  }
+
+  if (currentTaskFilter === "completed") {
+    filtered = filtered.filter(
+      (task) => task.completed
+    );
+  }
+
+  if (currentTaskFilter === "overdue") {
+    filtered = filtered.filter(isTaskOverdue);
+  }
+
+
+  filtered.sort((a, b) => {
+
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1;
+    }
+
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+
+    return a.dueDate.localeCompare(b.dueDate);
+
+  });
+
+
+  if (!filtered.length) {
+
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <i data-lucide="clipboard-list"></i>
+        </div>
+
+        <h4>
+          ${tasks.length
+            ? "No tasks in this view"
+            : "Your to-do list is empty"}
+        </h4>
+
+        <p>
+          ${tasks.length
+            ? "Try another filter or add a new task."
+            : "Add your first task and start organising your day."}
+        </p>
+      </div>
+    `;
+
+    refreshIcons();
+    return;
+
+  }
+
+
+  list.innerHTML = filtered.map((task) => {
+
+    const priority = [
+      "low",
+      "medium",
+      "high"
+    ].includes(task.priority)
+      ? task.priority
+      : "medium";
+
+    const overdue = isTaskOverdue(task);
+
+    const dueLabel = task.dueDate
+      ? `Due ${formatDate(task.dueDate)}`
+      : "No due date";
+
+
+    return `
+      <article
+        class="item-card ${task.completed ? "is-complete" : ""}"
+        data-record-id="${escapeHTML(task.id)}"
+      >
+
+        <button
+          class="icon-button ${task.completed ? "complete-button" : ""}"
+          data-action="toggle-task"
+          data-id="${escapeHTML(task.id)}"
+          title="${task.completed ? "Mark pending" : "Mark complete"}"
+          aria-label="Toggle task completion"
+        >
+          <i data-lucide="${task.completed ? "check" : "circle"}"></i>
+        </button>
+
+        <div class="item-main">
+
+          <h4>${escapeHTML(task.title)}</h4>
+
+          <p>
+            ${dueLabel}
+
+            <span class="priority priority-${priority}">
+              ${priority} priority
+            </span>
+
+            <span class="category-pill">
+              ${escapeHTML(task.category || "Other")}
+            </span>
+
+            ${overdue
+              ? '<span class="status-pill status-overdue">Overdue</span>'
+              : ""}
+          </p>
+
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            class="icon-button"
+            data-action="edit-task"
+            data-id="${escapeHTML(task.id)}"
+            title="Edit task"
+            aria-label="Edit task"
+          >
+            <i data-lucide="pencil"></i>
+          </button>
+
+          <button
+            class="icon-button delete-button"
+            data-action="delete-task"
+            data-id="${escapeHTML(task.id)}"
+            title="Delete task"
+            aria-label="Delete task"
+          >
+            <i data-lucide="trash-2"></i>
+          </button>
+
+        </div>
+
+      </article>
+    `;
+
+  }).join("");
+
+
+  refreshIcons();
+
+}
+
+
+// Add or update a task.
+
+$("taskForm").addEventListener("submit", async (event) => {
+
+  event.preventDefault();
+
+  const id = $("taskEditId").value;
+
+  const data = {
+    title: $("taskName").value.trim(),
+    dueDate: $("taskDate").value,
+    priority: $("taskPriority").value,
+    category: $("taskCategory").value
+  };
+
+
+  if (!data.title) {
+    return showToast("Please enter a task name.");
+  }
+
+
+  if (id) {
+
+    const task = tasks.find(
+      (item) => String(item.id) === id
+    );
+
+    if (task) {
+      Object.assign(task, data);
+    }
+
+    showToast("Task updated.");
+
+  } else {
+
+    tasks.push({
+      id: makeId(),
+      ...data,
+      completed: false
     });
 
-    if (!task) return;
+    showToast("Task added to your list.");
 
-    task.completed = !task.completed;
+  }
 
-    saveData();
-    renderAll();
 
-    showToast(task.completed ? "Task completed!" : "Task reopened.");
+  await saveData();
+
+  closeForm("taskForm");
+
+  renderAll();
+
+});
+
+
+// Edit an existing task.
+
+function editTask(id) {
+
+  const task = tasks.find(
+    (item) => String(item.id) === String(id)
+  );
+
+  if (!task) return;
+
+  $("taskEditId").value = task.id;
+  $("taskName").value = task.title || "";
+  $("taskDate").value = task.dueDate || "";
+  $("taskPriority").value = task.priority || "medium";
+  $("taskCategory").value = task.category || "Other";
+
+  $("taskFormTitle").textContent = "Edit your task";
+  $("taskSubmit").textContent = "Update task";
+
+  $("taskForm").classList.remove("hidden");
+
+  showPage("tasks");
+
+  $("taskName").focus();
+
+  $("taskForm").scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+}
+
+
+// Complete or reopen a task.
+
+async function toggleTask(id) {
+
+  const task = tasks.find(
+    (item) => String(item.id) === String(id)
+  );
+
+  if (!task) return;
+
+  task.completed = !task.completed;
+
+  await saveData();
+
+  renderAll();
+
+  showToast(
+    task.completed
+      ? "Task completed!"
+      : "Task moved back to pending."
+  );
+
 }
 
 
 // Delete a task.
 
-function deleteTask(id) {
+async function deleteTask(id) {
 
-    tasks = tasks.filter(function(task) {
-        return task.id !== id;
-    });
+  tasks = tasks.filter(
+    (item) => String(item.id) !== String(id)
+  );
 
-    saveData();
-    renderAll();
+  await saveData();
 
-    showToast("Task deleted.");
+  renderAll();
+
+  showToast("Task deleted.");
+
 }
 
 
+// Task buttons.
 
-/* =========================
-   6. SUBSCRIPTION MANAGEMENT
-========================= */
+$("showTaskForm").addEventListener("click", () => {
+  openTaskForm();
+});
 
-const subscriptionForm = getElement("subscriptionForm");
+$("cancelTask").addEventListener("click", () => {
+  closeForm("taskForm");
+});
 
 
-// Display all subscriptions.
+// Task filters.
+
+document.querySelectorAll("[data-task-filter]").forEach((button) => {
+
+  button.addEventListener("click", () => {
+
+    currentTaskFilter = button.dataset.taskFilter;
+
+    document.querySelectorAll("[data-task-filter]").forEach((item) => {
+      item.classList.toggle("active", item === button);
+    });
+
+    renderTasks();
+
+  });
+
+});
+
+
+// =========================================================
+// 6. SUBSCRIPTION MANAGEMENT
+// =========================================================
 
 function renderSubscriptions() {
 
-    const subscriptionList = getElement("subscriptionList");
+  const list = $("subscriptionList");
 
-    if (subscriptions.length === 0) {
+  if (!subscriptions.length) {
 
-        subscriptionList.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">
-                    <i data-lucide="repeat"></i>
-                </div>
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <i data-lucide="repeat"></i>
+        </div>
 
-                <h4>No subscriptions added</h4>
+        <h4>No subscriptions added</h4>
 
-                <p>Add your subscriptions to keep track of recurring expenses.</p>
-            </div>
-        `;
-
-        refreshIcons();
-        return;
-    }
-
-
-    subscriptionList.innerHTML = subscriptions.map(function(subscription) {
-
-        return `
-            <article class="item-card">
-
-                <div class="preview-icon">
-                    <i data-lucide="repeat"></i>
-                </div>
-
-                <div class="item-main">
-
-                    <h4>${escapeHTML(subscription.name)}</h4>
-
-                    <p>
-                        Renews on ${formatDate(subscription.renewalDate)}
-                        <span class="cycle-label">
-                            ${subscription.cycle}
-                        </span>
-                    </p>
-
-                </div>
-
-                <div class="item-amount">
-                    ${formatMoney(subscription.amount)}
-                </div>
-
-                <div class="item-actions">
-
-                    <button
-                        class="icon-button"
-                        data-action="edit-subscription"
-                        data-id="${subscription.id}"
-                        aria-label="Edit subscription"
-                        title="Edit subscription"
-                    >
-                        <i data-lucide="pencil"></i>
-                    </button>
-
-                    <button
-                        class="icon-button delete-button"
-                        data-action="delete-subscription"
-                        data-id="${subscription.id}"
-                        aria-label="Delete subscription"
-                        title="Delete subscription"
-                    >
-                        <i data-lucide="trash-2"></i>
-                    </button>
-
-                </div>
-
-            </article>
-        `;
-
-    }).join("");
-
+        <p>
+          Add your subscriptions to keep track of their costs and renewal dates.
+        </p>
+      </div>
+    `;
 
     refreshIcons();
+    return;
+
+  }
+
+
+  const sorted = [...subscriptions].sort((a, b) => {
+    return (a.renewalDate || "9999").localeCompare(
+      b.renewalDate || "9999"
+    );
+  });
+
+
+  list.innerHTML = sorted.map((item) => {
+
+    return `
+      <article
+        class="item-card"
+        data-record-id="${escapeHTML(item.id)}"
+      >
+
+        <div class="preview-icon sub">
+          <i data-lucide="repeat"></i>
+        </div>
+
+        <div class="item-main">
+
+          <h4>${escapeHTML(item.name)}</h4>
+
+          <p>
+            Renews ${formatDate(item.renewalDate)}
+
+            <span class="cycle-label">
+              ${escapeHTML(item.cycle || "monthly")}
+            </span>
+          </p>
+
+        </div>
+
+        <div class="item-amount">
+          ${formatMoney(item.amount)}
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            class="icon-button"
+            data-action="edit-subscription"
+            data-id="${escapeHTML(item.id)}"
+            title="Edit subscription"
+            aria-label="Edit subscription"
+          >
+            <i data-lucide="pencil"></i>
+          </button>
+
+          <button
+            class="icon-button delete-button"
+            data-action="delete-subscription"
+            data-id="${escapeHTML(item.id)}"
+            title="Delete subscription"
+            aria-label="Delete subscription"
+          >
+            <i data-lucide="trash-2"></i>
+          </button>
+
+        </div>
+
+      </article>
+    `;
+
+  }).join("");
+
+
+  refreshIcons();
+
 }
 
 
 // Add or update a subscription.
 
-subscriptionForm.addEventListener("submit", function(event) {
+$("subscriptionForm").addEventListener("submit", async (event) => {
 
-    event.preventDefault();
+  event.preventDefault();
 
-    const editId = getElement("subscriptionEditId").value;
+  const id = $("subscriptionEditId").value;
 
-    const subscriptionData = {
-        name: getElement("subscriptionName").value.trim(),
-        amount: Number(getElement("subscriptionAmount").value),
-        cycle: getElement("subscriptionCycle").value,
-        renewalDate: getElement("subscriptionDate").value
-    };
+  const data = {
+    name: $("subscriptionName").value.trim(),
+    amount: Number($("subscriptionAmount").value),
+    cycle: $("subscriptionCycle").value,
+    renewalDate: $("subscriptionDate").value
+  };
 
 
-    if (!subscriptionData.name || subscriptionData.amount < 0) {
-        showToast("Please enter valid subscription details.");
-        return;
+  if (
+    !data.name ||
+    !Number.isFinite(data.amount) ||
+    data.amount < 0 ||
+    !data.renewalDate
+  ) {
+    return showToast("Please enter valid subscription details.");
+  }
+
+
+  if (id) {
+
+    const item = subscriptions.find(
+      (entry) => String(entry.id) === id
+    );
+
+    if (item) {
+      Object.assign(item, data);
     }
 
+    showToast("Subscription updated.");
 
-    if (editId) {
+  } else {
 
-        const subscription = subscriptions.find(function(item) {
-            return item.id === editId;
-        });
+    subscriptions.push({
+      id: makeId(),
+      ...data
+    });
 
-        if (subscription) {
-            Object.assign(subscription, subscriptionData);
-        }
+    showToast("Subscription added.");
 
-        showToast("Subscription updated.");
-
-    } else {
-
-        subscriptions.push({
-            id: createId(),
-            ...subscriptionData
-        });
-
-        showToast("Subscription added.");
-    }
+  }
 
 
-    saveData();
-    renderAll();
-    closeForm("subscriptionForm");
+  await saveData();
 
-    getElement("subscriptionSubmit").textContent = "Save subscription";
-    getElement("subscriptionFormTitle").textContent = "Add a subscription";
+  closeForm("subscriptionForm");
+
+  renderAll();
 
 });
 
 
-// Edit a subscription.
+// Edit subscription.
 
 function editSubscription(id) {
 
-    const subscription = subscriptions.find(function(item) {
-        return item.id === id;
-    });
+  const item = subscriptions.find(
+    (entry) => String(entry.id) === String(id)
+  );
 
-    if (!subscription) return;
+  if (!item) return;
 
-    showPage("subscriptions");
+  $("subscriptionEditId").value = item.id;
+  $("subscriptionName").value = item.name || "";
+  $("subscriptionAmount").value = item.amount ?? "";
+  $("subscriptionCycle").value = item.cycle || "monthly";
+  $("subscriptionDate").value = item.renewalDate || "";
 
-    getElement("subscriptionEditId").value = subscription.id;
-    getElement("subscriptionName").value = subscription.name;
-    getElement("subscriptionAmount").value = subscription.amount;
-    getElement("subscriptionCycle").value = subscription.cycle;
-    getElement("subscriptionDate").value = subscription.renewalDate;
+  $("subscriptionFormTitle").textContent = "Edit subscription";
+  $("subscriptionSubmit").textContent = "Update subscription";
 
-    getElement("subscriptionFormTitle").textContent = "Edit subscription";
-    getElement("subscriptionSubmit").textContent = "Update subscription";
+  $("subscriptionForm").classList.remove("hidden");
 
-    openForm("subscriptionForm", "subscriptionName");
+  showPage("subscriptions");
 
-    getElement("subscriptionForm").scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-    });
+  $("subscriptionName").focus();
+
 }
 
 
-// Delete a subscription.
+// Delete subscription.
 
-function deleteSubscription(id) {
+async function deleteSubscription(id) {
 
-    subscriptions = subscriptions.filter(function(item) {
-        return item.id !== id;
-    });
+  subscriptions = subscriptions.filter(
+    (item) => String(item.id) !== String(id)
+  );
 
-    saveData();
-    renderAll();
+  await saveData();
 
-    showToast("Subscription deleted.");
+  renderAll();
+
+  showToast("Subscription deleted.");
+
 }
 
 
+// Subscription form buttons.
 
-/* =========================
-   7. BILL MANAGEMENT
-========================= */
+$("showSubscriptionForm").addEventListener("click", () => {
 
-const billForm = getElement("billForm");
+  $("subscriptionForm").reset();
+
+  $("subscriptionEditId").value = "";
+
+  $("subscriptionFormTitle").textContent = "Add a subscription";
+  $("subscriptionSubmit").textContent = "Save subscription";
+
+  $("subscriptionForm").classList.remove("hidden");
+
+  $("subscriptionName").focus();
+
+});
 
 
-// Display all bills.
+$("cancelSubscription").addEventListener("click", () => {
+  closeForm("subscriptionForm");
+});
+
+
+// =========================================================
+// 7. BILL MANAGEMENT
+// =========================================================
 
 function renderBills() {
 
-    const billList = getElement("billList");
+  const list = $("billList");
 
-    if (bills.length === 0) {
-
-        billList.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">
-                    <i data-lucide="receipt"></i>
-                </div>
-
-                <h4>No bills added</h4>
-
-                <p>Add your upcoming bills and keep your payments organised.</p>
-            </div>
-        `;
-
-        refreshIcons();
-        return;
-    }
+  const unpaid = bills.filter((bill) => !bill.paid);
+  const paid = bills.filter((bill) => bill.paid);
 
 
-    const sortedBills = [...bills].sort(function(a, b) {
-        return a.dueDate.localeCompare(b.dueDate);
-    });
+  $("unpaidBillCount").textContent = unpaid.length;
+  $("paidBillCount").textContent = paid.length;
+
+  $("allBillsTotal").textContent = formatMoney(
+    bills.reduce(
+      (sum, bill) => sum + (Number(bill.amount) || 0),
+      0
+    )
+  );
 
 
-    billList.innerHTML = sortedBills.map(function(bill) {
+  if (!bills.length) {
 
-        return `
-            <article class="item-card">
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <i data-lucide="receipt"></i>
+        </div>
 
-                <div class="preview-icon payment-icon">
-                    <i data-lucide="receipt"></i>
-                </div>
+        <h4>No bills added</h4>
 
-                <div class="item-main">
-
-                    <h4>${escapeHTML(bill.name)}</h4>
-
-                    <p>
-                        Due ${formatDate(bill.dueDate)}
-
-                        <span class="payment-status ${bill.paid ? "payment-paid" : "payment-unpaid"}">
-                            ${bill.paid ? "Paid" : "Unpaid"}
-                        </span>
-                    </p>
-
-                </div>
-
-                <div class="item-amount">
-                    ${formatMoney(bill.amount)}
-                </div>
-
-                <div class="item-actions">
-
-                    <button
-                        class="icon-button"
-                        data-action="toggle-bill"
-                        data-id="${bill.id}"
-                        aria-label="${bill.paid ? "Mark unpaid" : "Mark paid"}"
-                        title="${bill.paid ? "Mark unpaid" : "Mark paid"}"
-                    >
-                        <i data-lucide="${bill.paid ? "undo-2" : "check"}"></i>
-                    </button>
-
-                    <button
-                        class="icon-button"
-                        data-action="edit-bill"
-                        data-id="${bill.id}"
-                        aria-label="Edit bill"
-                        title="Edit bill"
-                    >
-                        <i data-lucide="pencil"></i>
-                    </button>
-
-                    <button
-                        class="icon-button delete-button"
-                        data-action="delete-bill"
-                        data-id="${bill.id}"
-                        aria-label="Delete bill"
-                        title="Delete bill"
-                    >
-                        <i data-lucide="trash-2"></i>
-                    </button>
-
-                </div>
-
-            </article>
-        `;
-
-    }).join("");
-
+        <p>
+          Add a bill to keep its due date and payment status in one place.
+        </p>
+      </div>
+    `;
 
     refreshIcons();
+    return;
+
+  }
+
+
+  const sorted = [...bills].sort((a, b) => {
+    return (a.dueDate || "9999").localeCompare(
+      b.dueDate || "9999"
+    );
+  });
+
+
+  list.innerHTML = sorted.map((bill) => {
+
+    return `
+      <article
+        class="item-card"
+        data-record-id="${escapeHTML(bill.id)}"
+      >
+
+        <div class="preview-icon bill">
+          <i data-lucide="receipt"></i>
+        </div>
+
+        <div class="item-main">
+
+          <h4>${escapeHTML(bill.name)}</h4>
+
+          <p>
+            Due ${formatDate(bill.dueDate)}
+
+            <span class="status-pill ${bill.paid ? "status-paid" : "status-unpaid"}">
+              ${bill.paid ? "Paid" : "Unpaid"}
+            </span>
+
+            ${
+              !bill.paid && dateDifference(bill.dueDate) < 0
+                ? '<span class="status-pill status-overdue">Overdue</span>'
+                : ""
+            }
+          </p>
+
+        </div>
+
+        <div class="item-amount">
+          ${formatMoney(bill.amount)}
+        </div>
+
+        <div class="item-actions">
+
+          <button
+            class="icon-button ${bill.paid ? "complete-button" : ""}"
+            data-action="toggle-bill"
+            data-id="${escapeHTML(bill.id)}"
+            title="${bill.paid ? "Mark unpaid" : "Mark paid"}"
+            aria-label="Toggle bill payment"
+          >
+            <i data-lucide="${bill.paid ? "undo-2" : "check"}"></i>
+          </button>
+
+          <button
+            class="icon-button"
+            data-action="edit-bill"
+            data-id="${escapeHTML(bill.id)}"
+            title="Edit bill"
+            aria-label="Edit bill"
+          >
+            <i data-lucide="pencil"></i>
+          </button>
+
+          <button
+            class="icon-button delete-button"
+            data-action="delete-bill"
+            data-id="${escapeHTML(bill.id)}"
+            title="Delete bill"
+            aria-label="Delete bill"
+          >
+            <i data-lucide="trash-2"></i>
+          </button>
+
+        </div>
+
+      </article>
+    `;
+
+  }).join("");
+
+
+  refreshIcons();
+
 }
 
 
-// Add or update a bill.
+// Add or update bill.
 
-billForm.addEventListener("submit", function(event) {
+$("billForm").addEventListener("submit", async (event) => {
 
-    event.preventDefault();
+  event.preventDefault();
 
-    const editId = getElement("billEditId").value;
+  const id = $("billEditId").value;
 
-    const billData = {
-        name: getElement("billName").value.trim(),
-        amount: Number(getElement("billAmount").value),
-        dueDate: getElement("billDate").value
-    };
+  const data = {
+    name: $("billName").value.trim(),
+    amount: Number($("billAmount").value),
+    dueDate: $("billDate").value
+  };
 
 
-    if (!billData.name || billData.amount < 0) {
-        showToast("Please enter valid bill details.");
-        return;
+  if (
+    !data.name ||
+    !Number.isFinite(data.amount) ||
+    data.amount < 0 ||
+    !data.dueDate
+  ) {
+    return showToast("Please enter valid bill details.");
+  }
+
+
+  if (id) {
+
+    const bill = bills.find(
+      (item) => String(item.id) === id
+    );
+
+    if (bill) {
+      Object.assign(bill, data);
     }
 
+    showToast("Bill updated.");
 
-    if (editId) {
+  } else {
 
-        const bill = bills.find(function(item) {
-            return item.id === editId;
-        });
+    bills.push({
+      id: makeId(),
+      ...data,
+      paid: false
+    });
 
-        if (bill) {
-            Object.assign(bill, billData);
-        }
+    showToast("Bill added successfully.");
 
-        showToast("Bill updated.");
-
-    } else {
-
-        bills.push({
-            id: createId(),
-            ...billData,
-            paid: false
-        });
-
-        showToast("Bill added successfully.");
-    }
+  }
 
 
-    saveData();
-    renderAll();
-    closeForm("billForm");
+  await saveData();
 
-    getElement("billSubmit").textContent = "Save bill";
-    getElement("billFormTitle").textContent = "Add a new bill";
+  closeForm("billForm");
+
+  renderAll();
 
 });
 
 
-// Edit a bill.
+// Edit bill.
 
 function editBill(id) {
 
-    const bill = bills.find(function(item) {
-        return item.id === id;
-    });
+  const bill = bills.find(
+    (item) => String(item.id) === String(id)
+  );
 
-    if (!bill) return;
+  if (!bill) return;
 
-    showPage("bills");
+  $("billEditId").value = bill.id;
+  $("billName").value = bill.name || "";
+  $("billAmount").value = bill.amount ?? "";
+  $("billDate").value = bill.dueDate || "";
 
-    getElement("billEditId").value = bill.id;
-    getElement("billName").value = bill.name;
-    getElement("billAmount").value = bill.amount;
-    getElement("billDate").value = bill.dueDate;
+  $("billFormTitle").textContent = "Edit your bill";
+  $("billSubmit").textContent = "Update bill";
 
-    getElement("billFormTitle").textContent = "Edit your bill";
-    getElement("billSubmit").textContent = "Update bill";
+  $("billForm").classList.remove("hidden");
 
-    openForm("billForm", "billName");
+  showPage("bills");
 
-    getElement("billForm").scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-    });
+  $("billName").focus();
+
 }
 
 
-// Mark a bill paid or unpaid.
+// Mark bill paid or unpaid.
 
-function toggleBill(id) {
+async function toggleBill(id) {
 
-    const bill = bills.find(function(item) {
-        return item.id === id;
-    });
+  const bill = bills.find(
+    (item) => String(item.id) === String(id)
+  );
 
-    if (!bill) return;
+  if (!bill) return;
 
-    bill.paid = !bill.paid;
+  bill.paid = !bill.paid;
 
-    saveData();
-    renderAll();
+  await saveData();
 
-    showToast(bill.paid ? "Bill marked as paid." : "Bill marked as unpaid.");
+  renderAll();
+
+  showToast(
+    bill.paid
+      ? "Bill marked as paid."
+      : "Bill marked as unpaid."
+  );
+
 }
 
 
-// Delete a bill.
+// Delete bill.
 
-function deleteBill(id) {
+async function deleteBill(id) {
 
-    bills = bills.filter(function(item) {
-        return item.id !== id;
-    });
+  bills = bills.filter(
+    (item) => String(item.id) !== String(id)
+  );
 
-    saveData();
-    renderAll();
+  await saveData();
 
-    showToast("Bill deleted.");
+  renderAll();
+
+  showToast("Bill deleted.");
+
 }
 
 
+// Bill form buttons.
 
-/* =========================
-   8. DASHBOARD
-========================= */
+$("showBillForm").addEventListener("click", () => {
 
-// Update the statistics on the overview page.
+  $("billForm").reset();
+
+  $("billEditId").value = "";
+
+  $("billFormTitle").textContent = "Add a new bill";
+  $("billSubmit").textContent = "Save bill";
+
+  $("billForm").classList.remove("hidden");
+
+  $("billName").focus();
+
+});
+
+
+$("cancelBill").addEventListener("click", () => {
+  closeForm("billForm");
+});
+
+
+// =========================================================
+// 8. PLANNER AND CALENDAR
+// =========================================================
+
+// Collect all tasks, bills and subscription renewals
+// and convert them into calendar events.
+
+function getCalendarEvents() {
+
+  const events = [];
+
+
+  tasks.forEach((task) => {
+
+    if (task.dueDate) {
+
+      events.push({
+        id: task.id,
+        title: task.title,
+        date: task.dueDate,
+        kind: "task",
+        detail: task.completed
+          ? "Completed task"
+          : `${task.priority || "medium"} priority task`,
+        completed: Boolean(task.completed)
+      });
+
+    }
+
+  });
+
+
+  bills.forEach((bill) => {
+
+    if (bill.dueDate) {
+
+      events.push({
+        id: bill.id,
+        title: bill.name,
+        date: bill.dueDate,
+        kind: "bill",
+        detail: bill.paid
+          ? "Bill paid"
+          : `Payment due · ${formatMoney(bill.amount)}`,
+        completed: Boolean(bill.paid)
+      });
+
+    }
+
+  });
+
+
+  subscriptions.forEach((item) => {
+
+    if (item.renewalDate) {
+
+      events.push({
+        id: item.id,
+        title: item.name,
+        date: item.renewalDate,
+        kind: "sub",
+        detail: `Renewal · ${formatMoney(item.amount)}`,
+        completed: false
+      });
+
+    }
+
+  });
+
+
+  return events;
+
+}
+
+
+function eventsOnDate(value) {
+
+  return getCalendarEvents().filter((event) => {
+    return event.date === value;
+  });
+
+}
+
+
+// Display schedule for the selected calendar day.
+
+function renderSelectedDay() {
+
+  const date = parseDate(selectedDate);
+
+  $("selectedDateTitle").textContent =
+    date?.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short"
+    }) || "Selected day";
+
+  $("selectedDateSubtitle").textContent =
+    formatLongDate(selectedDate);
+
+
+  const events = eventsOnDate(selectedDate);
+
+
+  if (!events.length) {
+
+    $("selectedDayItems").innerHTML = `
+      <div class="day-empty">
+        Nothing scheduled for this date yet.<br>
+        Use the + button to add a task.
+      </div>
+    `;
+
+    return;
+
+  }
+
+
+  const iconByKind = {
+    task: "check-circle-2",
+    bill: "receipt",
+    sub: "repeat"
+  };
+
+
+  $("selectedDayItems").innerHTML = events.map((event) => {
+
+    return `
+      <div class="day-item">
+
+        <span class="day-item-icon ${event.kind}">
+          <i data-lucide="${iconByKind[event.kind]}"></i>
+        </span>
+
+        <span class="day-item-copy">
+          <strong>${escapeHTML(event.title)}</strong>
+          <small>${escapeHTML(event.detail)}</small>
+        </span>
+
+      </div>
+    `;
+
+  }).join("");
+
+
+  refreshIcons();
+
+}
+
+
+// Display the monthly calendar.
+
+function renderPlanner() {
+
+  const year = plannerMonth.getFullYear();
+  const month = plannerMonth.getMonth();
+
+
+  $("plannerMonthTitle").textContent =
+    plannerMonth.toLocaleDateString("en-IN", {
+      month: "long",
+      year: "numeric"
+    });
+
+
+  const firstDay = new Date(year, month, 1);
+
+  // Monday-first calendar.
+
+  const startOffset = (firstDay.getDay() + 6) % 7;
+
+  const gridStart = new Date(
+    year,
+    month,
+    1 - startOffset
+  );
+
+
+  const today = dateKey(new Date());
+  const allEvents = getCalendarEvents();
+
+  const html = [];
+
+
+  // Six rows of seven days.
+
+  for (let index = 0; index < 42; index++) {
+
+    const date = new Date(
+      gridStart.getFullYear(),
+      gridStart.getMonth(),
+      gridStart.getDate() + index
+    );
+
+    const key = dateKey(date);
+
+    const dayEvents = allEvents.filter((event) => {
+      return event.date === key;
+    });
+
+
+    const classes = ["calendar-day"];
+
+    if (date.getMonth() !== month) {
+      classes.push("other-month");
+    }
+
+    if (key === today) {
+      classes.push("today");
+    }
+
+    if (key === selectedDate) {
+      classes.push("selected");
+    }
+
+
+    const chips = dayEvents.slice(0, 2).map((event) => {
+
+      return `
+        <span class="calendar-event ${event.kind}-event">
+          ${escapeHTML(event.title)}
+        </span>
+      `;
+
+    }).join("");
+
+
+    const extra = dayEvents.length > 2
+      ? `<span class="more-events">+${dayEvents.length - 2} more</span>`
+      : "";
+
+
+    html.push(`
+      <button
+        class="${classes.join(" ")}"
+        data-calendar-date="${key}"
+        aria-label="${formatLongDate(key)}; ${dayEvents.length} items"
+      >
+
+        <span class="day-number">${date.getDate()}</span>
+
+        ${key === today
+          ? '<span class="today-label">TODAY</span>'
+          : ""}
+
+        ${chips}
+
+        ${extra}
+
+      </button>
+    `);
+
+  }
+
+
+  $("calendarGrid").innerHTML = html.join("");
+
+  renderSelectedDay();
+
+}
+
+
+// Previous month.
+
+$("previousMonth").addEventListener("click", () => {
+
+  plannerMonth = new Date(
+    plannerMonth.getFullYear(),
+    plannerMonth.getMonth() - 1,
+    1
+  );
+
+  selectedDate = dateKey(plannerMonth);
+
+  renderPlanner();
+
+});
+
+
+// Next month.
+
+$("nextMonth").addEventListener("click", () => {
+
+  plannerMonth = new Date(
+    plannerMonth.getFullYear(),
+    plannerMonth.getMonth() + 1,
+    1
+  );
+
+  selectedDate = dateKey(plannerMonth);
+
+  renderPlanner();
+
+});
+
+
+// Return to current date.
+
+$("goToday").addEventListener("click", () => {
+
+  const now = new Date();
+
+  plannerMonth = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1
+  );
+
+  selectedDate = dateKey(now);
+
+  renderPlanner();
+
+});
+
+
+// Select a calendar date.
+
+$("calendarGrid").addEventListener("click", (event) => {
+
+  const button = event.target.closest("[data-calendar-date]");
+
+  if (!button) return;
+
+  selectedDate = button.dataset.calendarDate;
+
+  const date = parseDate(selectedDate);
+
+  plannerMonth = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    1
+  );
+
+  renderPlanner();
+
+});
+
+
+// Add a task directly from the selected date.
+
+$("addTaskForSelectedDate").addEventListener("click", () => {
+  openTaskForm(selectedDate);
+});
+
+
+// =========================================================
+// 9. REMINDERS
+// =========================================================
+
+function reminderText(value) {
+
+  const difference = dateDifference(value);
+
+  if (difference === 0) return "Due today";
+
+  if (difference === 1) return "Due tomorrow";
+
+  if (difference < 0) {
+    return `Overdue by ${Math.abs(difference)} day${Math.abs(difference) === 1 ? "" : "s"}`;
+  }
+
+  return `In ${difference} days`;
+
+}
+
+
+function renderReminders() {
+
+  const today = dateKey(new Date());
+
+
+  // Due today or overdue.
+
+  const todayEvents = getCalendarEvents().filter((event) => {
+
+    if (event.kind === "task" && event.completed) return false;
+
+    if (event.kind === "bill" && event.completed) return false;
+
+    return event.date <= today;
+
+  }).sort((a, b) => a.date.localeCompare(b.date));
+
+
+  // Due in the next seven days.
+
+  const upcoming = getCalendarEvents().filter((event) => {
+
+    if (event.kind === "task" && event.completed) return false;
+
+    if (event.kind === "bill" && event.completed) return false;
+
+    const difference = dateDifference(event.date);
+
+    return difference > 0 && difference <= 7;
+
+  }).sort((a, b) => a.date.localeCompare(b.date));
+
+
+  const renderRows = (events) => {
+
+    if (!events.length) {
+
+      return `
+        <div class="empty-small">
+          Nothing to show here right now.
+        </div>
+      `;
+
+    }
+
+
+    return events.slice(0, 5).map((event) => {
+
+      const icon =
+        event.kind === "task"
+          ? "check-circle-2"
+          : event.kind === "bill"
+            ? "receipt"
+            : "repeat";
+
+      const kindClass =
+        event.kind === "task" ? "" : event.kind;
+
+
+      const typeLabel =
+        event.kind === "task"
+          ? "Task"
+          : event.kind === "bill"
+            ? "Bill"
+            : "Subscription";
+
+
+      return `
+        <div class="preview-row">
+
+          <span class="preview-icon ${kindClass}">
+            <i data-lucide="${icon}"></i>
+          </span>
+
+          <span class="preview-details">
+            <h4>${escapeHTML(event.title)}</h4>
+            <p>${typeLabel} · ${reminderText(event.date)}</p>
+          </span>
+
+        </div>
+      `;
+
+    }).join("");
+
+  };
+
+
+  $("todayReminders").innerHTML = todayEvents.length
+    ? renderRows(todayEvents)
+    : `<div class="empty-small">No overdue or due-today items. You're all caught up!</div>`;
+
+  $("upcomingReminders").innerHTML = renderRows(upcoming);
+
+  refreshIcons();
+
+}
+
+
+// =========================================================
+// 10. DASHBOARD
+// =========================================================
+
+function getFocusStats() {
+
+  try {
+
+    const saved = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.focus) || "{}"
+    );
+
+    if (saved.date !== dateKey(new Date())) {
+      return {
+        date: dateKey(new Date()),
+        count: 0
+      };
+    }
+
+    return {
+      date: saved.date,
+      count: Number(saved.count) || 0
+    };
+
+  } catch {
+
+    return {
+      date: dateKey(new Date()),
+      count: 0
+    };
+
+  }
+
+}
+
 
 function updateDashboard() {
 
-    // Count unfinished tasks.
+  const open = tasks.filter(
+    (task) => !task.completed
+  ).length;
 
-    const openTasks = tasks.filter(function(task) {
-        return !task.completed;
-    }).length;
+  const completed = tasks.filter(
+    (task) => task.completed
+  ).length;
 
+  const focusCount = getFocusStats().count;
 
-    // Count subscriptions.
+  const now = new Date();
 
-    const subscriptionCount = subscriptions.length;
+  const monthStart = dateKey(
+    new Date(now.getFullYear(), now.getMonth(), 1)
+  );
 
-
-    // Calculate estimated monthly subscription cost.
-
-    const monthlyCost = subscriptions.reduce(function(total, subscription) {
-
-        const amount = Number(subscription.amount) || 0;
-
-        if (subscription.cycle === "yearly") {
-            return total + amount / 12;
-        }
-
-        return total + amount;
-
-    }, 0);
+  const monthEnd = dateKey(
+    new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  );
 
 
-    getElement("statOpenTasks").textContent = openTasks;
-    getElement("statSubscriptions").textContent = subscriptionCount;
-    getElement("statMonthlySpend").textContent = formatMoney(monthlyCost);
+  // Convert yearly subscriptions into monthly equivalents.
+
+  const subscriptionMonthly = subscriptions.reduce(
+    (sum, item) => {
+      return sum +
+        (Number(item.amount) || 0) /
+        (item.cycle === "yearly" ? 12 : 1);
+    },
+    0
+  );
 
 
-    renderOverviewTasks();
-    renderOverviewPayments();
+  // Count only unpaid bills in the current month.
+
+  const unpaidBillsThisMonth = bills
+    .filter((bill) => (
+      !bill.paid &&
+      bill.dueDate >= monthStart &&
+      bill.dueDate <= monthEnd
+    ))
+    .reduce(
+      (sum, bill) => sum + (Number(bill.amount) || 0),
+      0
+    );
+
+
+  $("statOpenTasks").textContent = open;
+
+  $("statCompleted").textContent = completed;
+
+  $("taskProgressText").textContent = tasks.length
+    ? `${Math.round(completed / tasks.length * 100)}% of all tasks`
+    : "Ready for your first task";
+
+  $("statMonthlyCost").textContent =
+    formatMoney(subscriptionMonthly + unpaidBillsThisMonth);
+
+  $("statFocusSessions").textContent = focusCount;
+
+  $("expenseTotal").textContent =
+    formatMoney(subscriptionMonthly + unpaidBillsThisMonth);
+
+  $("subscriptionEstimate").textContent =
+    formatMoney(subscriptionMonthly);
+
+  $("unpaidBillsTotal").textContent =
+    formatMoney(unpaidBillsThisMonth);
+
+
+  // Show pending tasks on the overview.
+
+  const preview = [...tasks]
+    .filter((task) => !task.completed)
+    .sort((a, b) => (
+      (a.dueDate || "9999").localeCompare(b.dueDate || "9999")
+    ))
+    .slice(0, 4);
+
+
+  $("overviewTasks").innerHTML = preview.length
+    ? preview.map((task) => `
+        <div class="preview-row">
+
+          <span class="preview-icon">
+            <i data-lucide="check-circle-2"></i>
+          </span>
+
+          <span class="preview-details">
+            <h4>${escapeHTML(task.title)}</h4>
+            <p>${task.dueDate ? `Due ${formatDate(task.dueDate)}` : "No due date"}</p>
+          </span>
+
+          <span class="preview-amount">
+            ${escapeHTML(task.priority || "medium")}
+          </span>
+
+        </div>
+      `).join("")
+    : `<div class="empty-small">Your pending tasks will appear here. Add one whenever you're ready.</div>`;
+
+
+  renderReminders();
+
+  refreshIcons();
+
 }
 
 
-// Show a small task preview on the dashboard.
+// =========================================================
+// 11. GLOBAL SEARCH
+// =========================================================
 
-function renderOverviewTasks() {
+function searchItems(query) {
 
-    const container = getElement("overviewTasks");
+  const q = query.trim().toLowerCase();
 
-    const unfinishedTasks = tasks
-        .filter(function(task) {
-            return !task.completed;
-        })
-        .sort(function(a, b) {
-
-            if (!a.dueDate) return 1;
-            if (!b.dueDate) return -1;
-
-            return a.dueDate.localeCompare(b.dueDate);
-
-        })
-        .slice(0, 4);
+  if (!q) return [];
 
 
-    if (unfinishedTasks.length === 0) {
+  return [
 
-        container.innerHTML = `
-            <div class="empty-small">
-                You're all caught up! Add a task whenever you're ready.
-            </div>
-        `;
+    ...tasks.map((item) => ({
+      ...item,
+      type: "task",
+      page: "tasks",
+      label: item.title
+    })),
 
-        return;
-    }
+    ...subscriptions.map((item) => ({
+      ...item,
+      type: "subscription",
+      page: "subscriptions",
+      label: item.name
+    })),
+
+    ...bills.map((item) => ({
+      ...item,
+      type: "bill",
+      page: "bills",
+      label: item.name
+    }))
+
+  ].filter((item) => {
+
+    return String(item.label || "")
+      .toLowerCase()
+      .includes(q);
+
+  }).slice(0, 8);
+
+}
 
 
-    container.innerHTML = unfinishedTasks.map(function(task) {
+$("globalSearch").addEventListener("input", () => {
 
-        return `
-            <div class="preview-row">
+  const results = searchItems(
+    $("globalSearch").value
+  );
 
-                <div class="preview-icon">
-                    <i data-lucide="check-circle-2"></i>
-                </div>
+  const container = $("searchResults");
 
-                <div class="preview-details">
-                    <h4>${escapeHTML(task.title)}</h4>
-                    <p>${task.dueDate ? "Due " + formatDate(task.dueDate) : "No due date"}</p>
-                </div>
 
-            </div>
-        `;
+  if (!$("globalSearch").value.trim()) {
+
+    container.classList.add("hidden");
+    container.innerHTML = "";
+
+    return;
+
+  }
+
+
+  if (!results.length) {
+
+    container.innerHTML = `
+      <div class="search-empty">
+        No matching items found.
+      </div>
+    `;
+
+  } else {
+
+    const icons = {
+      task: "list-checks",
+      subscription: "repeat",
+      bill: "receipt"
+    };
+
+
+    container.innerHTML = results.map((item) => {
+
+      return `
+        <button
+          class="search-result"
+          data-search-page="${item.page}"
+          data-search-id="${escapeHTML(item.id)}"
+        >
+
+          <i data-lucide="${icons[item.type]}"></i>
+
+          <span>${escapeHTML(item.label)}</span>
+
+          <small>${item.type}</small>
+
+        </button>
+      `;
 
     }).join("");
 
-
     refreshIcons();
+
+  }
+
+
+  container.classList.remove("hidden");
+
+});
+
+
+// Close the search list when clicking outside it.
+
+document.addEventListener("click", (event) => {
+
+  if (!event.target.closest(".search-wrap")) {
+    $("searchResults").classList.add("hidden");
+  }
+
+
+  const result = event.target.closest("[data-search-page]");
+
+  if (result) {
+
+    showPage(result.dataset.searchPage);
+
+    $("globalSearch").value = "";
+
+    $("searchResults").classList.add("hidden");
+
+
+    setTimeout(() => {
+
+      const card = document.querySelector(
+        `[data-record-id="${CSS.escape(result.dataset.searchId)}"]`
+      );
+
+      if (card) {
+        card.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }
+
+    }, 80);
+
+  }
+
+});
+
+
+// Quick Add opens a new task with today's date.
+
+$("quickAddButton").addEventListener("click", () => {
+  openTaskForm(dateKey(new Date()));
+});
+
+
+// =========================================================
+// 12. POMODORO FOCUS TIMER
+// =========================================================
+
+const focusDurations = {
+  focus: 25 * 60,
+  short: 5 * 60,
+  long: 15 * 60
+};
+
+const focusLabels = {
+  focus: "FOCUS SESSION",
+  short: "SHORT BREAK",
+  long: "LONG BREAK"
+};
+
+let focusMode = "focus";
+
+let remainingSeconds = focusDurations.focus;
+
+let timerInterval = null;
+
+
+// Update the timer display.
+
+function updateTimerDisplay() {
+
+  const minutes = Math.floor(
+    remainingSeconds / 60
+  ).toString().padStart(2, "0");
+
+  const seconds = (
+    remainingSeconds % 60
+  ).toString().padStart(2, "0");
+
+
+  $("timerDisplay").textContent =
+    `${minutes}:${seconds}`;
+
+  $("timerModeLabel").textContent =
+    focusLabels[focusMode];
+
+
+  const progress = (
+    (focusDurations[focusMode] - remainingSeconds) /
+    focusDurations[focusMode]
+  ) * 100;
+
+
+  $("timerProgress").parentElement.style.setProperty("--timer-progress", `${progress}%`);
+
+
+  $("timerStatus").textContent = timerInterval
+    ? "You're in the zone"
+    : "Ready when you are";
+
+
+  const button = $("startPauseTimer");
+
+
+  button.innerHTML = timerInterval
+    ? '<i data-lucide="pause"></i><span>Pause</span>'
+    : '<i data-lucide="play"></i><span>Start</span>';
+
+
+  refreshIcons();
+
 }
 
 
-// Combine bills and subscriptions for the payment preview.
+// Switch between focus and break modes.
 
-function getPaymentItems() {
+function setFocusMode(mode) {
 
-    const subscriptionPayments = subscriptions.map(function(subscription) {
+  if (!focusDurations[mode]) return;
 
-        return {
-            name: subscription.name,
-            amount: subscription.amount,
-            date: subscription.renewalDate,
-            type: "Subscription",
-            paid: false
-        };
+  clearInterval(timerInterval);
 
-    });
+  timerInterval = null;
+
+  focusMode = mode;
+
+  remainingSeconds = focusDurations[mode];
 
 
-    const billPayments = bills
-        .filter(function(bill) {
-            return !bill.paid;
-        })
-        .map(function(bill) {
+  document.querySelectorAll("[data-focus-mode]").forEach((button) => {
 
-            return {
-                name: bill.name,
-                amount: bill.amount,
-                date: bill.dueDate,
-                type: "Bill",
-                paid: false
-            };
+    button.classList.toggle(
+      "active",
+      button.dataset.focusMode === mode
+    );
 
-        });
+  });
 
 
-    return [...subscriptionPayments, ...billPayments]
-        .filter(function(item) {
-            return item.date;
-        })
-        .sort(function(a, b) {
-            return a.date.localeCompare(b.date);
-        });
+  updateTimerDisplay();
+
 }
 
 
-// Show upcoming payments on the dashboard.
+// Handle completed sessions.
 
-function renderOverviewPayments() {
+function completeFocusSession() {
 
-    const container = getElement("overviewPayments");
+  if (focusMode === "focus") {
 
-    const payments = getPaymentItems().slice(0, 4);
+    const stats = getFocusStats();
+
+    stats.count += 1;
+
+    localStorage.setItem(
+      STORAGE_KEYS.focus,
+      JSON.stringify(stats)
+    );
 
 
-    if (payments.length === 0) {
+    showToast(
+      "Focus session complete. Take a little break!"
+    );
 
-        container.innerHTML = `
-            <div class="empty-small">
-                No upcoming payments. Add a bill or subscription to get started.
-            </div>
-        `;
 
-        return;
+    const nextMode = stats.count % 4 === 0
+      ? "long"
+      : "short";
+
+
+    updateDashboard();
+
+    $("focusTodayCount").textContent = stats.count;
+
+    setFocusMode(nextMode);
+
+  } else {
+
+    showToast(
+      "Break complete. Ready for another focus session?"
+    );
+
+    setFocusMode("focus");
+
+  }
+
+}
+
+
+// Start or pause timer.
+
+function startTimer() {
+
+  if (timerInterval) {
+
+    clearInterval(timerInterval);
+
+    timerInterval = null;
+
+    updateTimerDisplay();
+
+    return;
+
+  }
+
+
+  if (remainingSeconds <= 0) {
+    remainingSeconds = focusDurations[focusMode];
+  }
+
+
+  timerInterval = setInterval(() => {
+
+    remainingSeconds -= 1;
+
+
+    if (remainingSeconds <= 0) {
+
+      remainingSeconds = 0;
+
+      clearInterval(timerInterval);
+
+      timerInterval = null;
+
+      updateTimerDisplay();
+
+      completeFocusSession();
+
+      return;
+
     }
 
 
-    container.innerHTML = payments.map(function(payment) {
+    updateTimerDisplay();
 
-        return `
-            <div class="preview-row">
-
-                <div class="preview-icon payment-icon">
-                    <i data-lucide="wallet"></i>
-                </div>
-
-                <div class="preview-details">
-                    <h4>${escapeHTML(payment.name)}</h4>
-                    <p>${payment.type} · ${formatDate(payment.date)}</p>
-                </div>
-
-                <span class="preview-amount">
-                    ${formatMoney(payment.amount)}
-                </span>
-
-            </div>
-        `;
-
-    }).join("");
+  }, 1000);
 
 
-    refreshIcons();
+  updateTimerDisplay();
+
 }
 
 
+// Timer buttons.
 
-/* =========================
-   9. CALENDAR
-========================= */
+$("startPauseTimer").addEventListener("click", startTimer);
 
-function renderCalendar() {
 
-    const calendarList = getElement("calendarList");
+$("resetTimer").addEventListener("click", () => {
 
-    const calendarItems = [];
+  clearInterval(timerInterval);
 
+  timerInterval = null;
 
-    // Add tasks with due dates.
+  remainingSeconds = focusDurations[focusMode];
 
-    tasks.forEach(function(task) {
-
-        if (task.dueDate) {
-
-            calendarItems.push({
-                name: task.title,
-                date: task.dueDate,
-                type: "Task",
-                details: task.completed ? "Completed" : "To do"
-            });
-
-        }
-
-    });
-
-
-    // Add bills.
-
-    bills.forEach(function(bill) {
-
-        calendarItems.push({
-            name: bill.name,
-            date: bill.dueDate,
-            type: "Bill",
-            details: bill.paid ? "Payment completed" : "Payment pending"
-        });
-
-    });
-
-
-    // Add subscription renewals.
-
-    subscriptions.forEach(function(subscription) {
-
-        calendarItems.push({
-            name: subscription.name,
-            date: subscription.renewalDate,
-            type: "Renewal",
-            details: formatMoney(subscription.amount) + " · " + subscription.cycle
-        });
-
-    });
-
-
-    // Sort everything by date.
-
-    calendarItems.sort(function(a, b) {
-        return a.date.localeCompare(b.date);
-    });
-
-
-    if (calendarItems.length === 0) {
-
-        calendarList.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">
-                    <i data-lucide="calendar-days"></i>
-                </div>
-
-                <h4>Your calendar is empty</h4>
-
-                <p>Add tasks, bills or subscriptions to see them here.</p>
-            </div>
-        `;
-
-        refreshIcons();
-        return;
-    }
-
-
-    calendarList.innerHTML = calendarItems.map(function(item) {
-
-        const dateParts = getDayAndMonth(item.date);
-
-        return `
-            <div class="calendar-row">
-
-                <div class="calendar-date">
-                    <strong>${dateParts.day}</strong>
-                    <span>${dateParts.month}</span>
-                </div>
-
-                <div class="calendar-details">
-                    <h4>${escapeHTML(item.name)}</h4>
-                    <p>${escapeHTML(item.details)}</p>
-                </div>
-
-                <span class="calendar-type">
-                    ${item.type}
-                </span>
-
-            </div>
-        `;
-
-    }).join("");
-
-
-    refreshIcons();
-}
-
-
-
-/* =========================
-   10. BUTTON EVENT HANDLING
-========================= */
-
-// Handle actions such as edit, delete, complete and mark paid.
-
-document.addEventListener("click", function(event) {
-
-    const button = event.target.closest("[data-action]");
-
-    if (!button) return;
-
-    const id = button.dataset.id;
-    const action = button.dataset.action;
-
-
-    switch (action) {
-
-        // TASK ACTIONS
-
-        case "toggle-task":
-            toggleTask(id);
-            break;
-
-        case "edit-task":
-            editTask(id);
-            break;
-
-        case "delete-task":
-            deleteTask(id);
-            break;
-
-
-        // SUBSCRIPTION ACTIONS
-
-        case "edit-subscription":
-            editSubscription(id);
-            break;
-
-        case "delete-subscription":
-            deleteSubscription(id);
-            break;
-
-
-        // BILL ACTIONS
-
-        case "toggle-bill":
-            toggleBill(id);
-            break;
-
-        case "edit-bill":
-            editBill(id);
-            break;
-
-        case "delete-bill":
-            deleteBill(id);
-            break;
-
-    }
+  updateTimerDisplay();
 
 });
 
 
+document.querySelectorAll("[data-focus-mode]").forEach((button) => {
 
-/* =========================
-   11. FORM BUTTONS
-========================= */
-
-// Open task form.
-
-getElement("showTaskForm").addEventListener("click", function() {
-
-    getElement("taskEditId").value = "";
-    getElement("taskFormTitle").textContent = "Create a new task";
-    getElement("taskSubmit").textContent = "Save task";
-
-    openForm("taskForm", "taskName");
+  button.addEventListener("click", () => {
+    setFocusMode(button.dataset.focusMode);
+  });
 
 });
 
 
-// Open subscription form.
-
-getElement("showSubscriptionForm").addEventListener("click", function() {
-
-    getElement("subscriptionEditId").value = "";
-    getElement("subscriptionFormTitle").textContent = "Add a subscription";
-    getElement("subscriptionSubmit").textContent = "Save subscription";
-
-    openForm("subscriptionForm", "subscriptionName");
-
-});
-
-
-// Open bill form.
-
-getElement("showBillForm").addEventListener("click", function() {
-
-    getElement("billEditId").value = "";
-    getElement("billFormTitle").textContent = "Add a new bill";
-    getElement("billSubmit").textContent = "Save bill";
-
-    openForm("billForm", "billName");
-
-});
-
-
-// Cancel editing or adding.
-
-getElement("cancelTaskEdit").addEventListener("click", function() {
-    closeForm("taskForm");
-});
-
-getElement("cancelSubscriptionEdit").addEventListener("click", function() {
-    closeForm("subscriptionForm");
-});
-
-getElement("cancelBillEdit").addEventListener("click", function() {
-    closeForm("billForm");
-});
-
-
-
-/* =========================
-   12. CURRENT DATE
-========================= */
+// =========================================================
+// 13. DISPLAY DATE AND RENDER THE APPLICATION
+// =========================================================
 
 function displayCurrentDate() {
 
-    const today = new Date();
-
-    getElement("todayLabel").textContent =
-        today.toLocaleDateString("en-IN", {
-            weekday: "short",
-            day: "numeric",
-            month: "short"
-        });
+  $("todayLabel").textContent =
+    new Date().toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short"
+    });
 
 }
 
 
-
-/* =========================
-   13. RENDER EVERYTHING
-========================= */
+// Render all application sections.
 
 function renderAll() {
 
-    renderTasks();
-    renderSubscriptions();
-    renderBills();
+  renderTasks();
 
-    updateDashboard();
-    renderCalendar();
+  renderSubscriptions();
 
-    refreshIcons();
+  renderBills();
+
+  renderPlanner();
+
+  updateDashboard();
+
+  $("focusTodayCount").textContent =
+    getFocusStats().count;
+
+  refreshIcons();
+
 }
 
 
-
-/* =========================
-   14. START THE WEBSITE
-========================= */
+// Start ORBIT.
 
 async function startOrbit() {
 
-    try {
+  displayCurrentDate();
 
-        const response = await fetch("/api/data");
+  await loadData();
 
-        if (!response.ok) {
-            throw new Error("Could not load backend data");
-        }
+  renderAll();
 
-        const data = await response.json();
+  showPage("overview");
 
-        const hasServerData =
-            data.tasks.length > 0 ||
-            data.subscriptions.length > 0 ||
-            data.bills.length > 0;
+  updateTimerDisplay();
 
-        if (hasServerData) {
-
-            tasks = data.tasks;
-            subscriptions = data.subscriptions;
-            bills = data.bills;
-
-        } else {
-
-            // Preserve any information already saved in the browser.
-            await saveData();
-
-        }
-
-    } catch (error) {
-
-        console.error(error);
-        showToast("Backend unavailable. Using browser storage.");
-
-    }
-
-    displayCurrentDate();
-    renderAll();
-    showPage("overview");
 }
 
 startOrbit();
+
 

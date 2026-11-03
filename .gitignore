@@ -1,2 +1,13 @@
 
+# Node dependencies
 node_modules/
+
+# Private environment files
+.env
+
+# npm logs
+npm-debug.log*
+
+# Operating system files
+.DS_Store
+Thumbs.db

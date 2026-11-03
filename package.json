@@ -1,8 +1,9 @@
 
 {
-  "name": "orbit",
+  "name": "orbit-personal-hub",
   "version": "1.0.0",
-  "description": "A simple personal productivity and expense tracker",
+  "private": true,
+  "description": "ORBIT - a personal planner, productivity and expense tracker",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

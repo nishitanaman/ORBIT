@@ -1,0 +1,568 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ORBIT | Your Personal Hub</title>
+
+    <meta name="description" content="ORBIT - Your personal space for tasks, subscriptions and bills.">
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">
+                <i data-lucide="orbit"></i>
+            </div>
+
+            <div>
+                <h2>ORBIT</h2>
+                <p>Your personal hub</p>
+            </div>
+        </div>
+
+        <p class="sidebar-label">WORKSPACE</p>
+
+        <nav class="navigation">
+
+            <button class="nav-link active" data-page="overview">
+                <i data-lucide="layout-dashboard"></i>
+                <span>Overview</span>
+            </button>
+
+            <button class="nav-link" data-page="tasks">
+                <i data-lucide="check-square"></i>
+                <span>My Tasks</span>
+            </button>
+
+            <button class="nav-link" data-page="subscriptions">
+                <i data-lucide="repeat"></i>
+                <span>Subscriptions</span>
+            </button>
+
+            <button class="nav-link" data-page="bills">
+                <i data-lucide="receipt"></i>
+                <span>Bills</span>
+            </button>
+
+            <button class="nav-link" data-page="calendar">
+                <i data-lucide="calendar-days"></i>
+                <span>Calendar</span>
+            </button>
+
+        </nav>
+
+        <div class="sidebar-bottom">
+            <div class="sidebar-note">
+                <div class="note-icon">
+                    <i data-lucide="sparkles"></i>
+                </div>
+
+                <p>A little organisation goes a long way.</p>
+            </div>
+
+            <div class="sidebar-footer">
+                <span class="status-dot"></span>
+                Your space is ready
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <!-- TOP BAR -->
+        <header class="topbar">
+
+            <div class="page-heading">
+                <p class="eyebrow">YOUR PERSONAL SPACE</p>
+                <h1 id="pageTitle">Overview</h1>
+                <p id="pageSubtitle">Everything you need, all in one place.</p>
+            </div>
+
+            <div class="topbar-right">
+                <div class="date-display">
+                    <i data-lucide="calendar"></i>
+                    <span id="todayLabel"></span>
+                </div>
+
+                <div class="profile-circle">O</div>
+            </div>
+
+        </header>
+
+
+        <!-- ========================= -->
+        <!-- OVERVIEW PAGE -->
+        <!-- ========================= -->
+
+        <section class="page-view active" id="view-overview">
+
+            <!-- Welcome Banner -->
+            <div class="welcome-banner">
+
+                <div class="welcome-content">
+                    <span class="welcome-tag">WELCOME TO YOUR SPACE</span>
+
+                    <h2>Everything in your life<br>revolves around one hub.</h2>
+
+                    <p>
+                        Stay organised, keep track of your spending,
+                        and make room for what matters.
+                    </p>
+
+                    <button class="primary-button light-button" data-go-page="tasks">
+                        Explore my tasks
+                        <i data-lucide="arrow-up-right"></i>
+                    </button>
+                </div>
+
+                <div class="orbit-decoration">
+                    <div class="orbit-ring ring-one"></div>
+                    <div class="orbit-ring ring-two"></div>
+                    <div class="orbit-ring ring-three"></div>
+                    <div class="orbit-center">O</div>
+                    <div class="orbit-dot dot-one"></div>
+                    <div class="orbit-dot dot-two"></div>
+                    <div class="orbit-dot dot-three"></div>
+                </div>
+
+            </div>
+
+
+            <!-- STATISTICS -->
+            <div class="stats-grid">
+
+                <div class="stat-card stat-lavender">
+                    <div class="stat-top">
+                        <div class="stat-icon">
+                            <i data-lucide="list-checks"></i>
+                        </div>
+                        <span class="stat-label">TASKS LEFT</span>
+                    </div>
+
+                    <h2 id="statOpenTasks">0</h2>
+                    <p>Things to get done</p>
+                </div>
+
+
+                <div class="stat-card stat-pink">
+                    <div class="stat-top">
+                        <div class="stat-icon">
+                            <i data-lucide="repeat"></i>
+                        </div>
+                        <span class="stat-label">SUBSCRIPTIONS</span>
+                    </div>
+
+                    <h2 id="statSubscriptions">0</h2>
+                    <p>Active subscriptions</p>
+                </div>
+
+
+                <div class="stat-card stat-blue">
+                    <div class="stat-top">
+                        <div class="stat-icon">
+                            <i data-lucide="wallet"></i>
+                        </div>
+                        <span class="stat-label">MONTHLY COST</span>
+                    </div>
+
+                    <h2 id="statMonthlySpend">₹0</h2>
+                    <p>Estimated subscription cost</p>
+                </div>
+
+            </div>
+
+
+            <!-- DASHBOARD CONTENT -->
+            <div class="dashboard-grid">
+
+                <div class="content-card">
+
+                    <div class="section-heading">
+                        <div>
+                            <h3>Upcoming tasks</h3>
+                            <p>A little progress every day.</p>
+                        </div>
+
+                        <button class="text-button" data-go-page="tasks">
+                            View all
+                            <i data-lucide="arrow-right"></i>
+                        </button>
+                    </div>
+
+                    <div id="overviewTasks" class="preview-list"></div>
+
+                </div>
+
+
+                <div class="content-card">
+
+                    <div class="section-heading">
+                        <div>
+                            <h3>Upcoming payments</h3>
+                            <p>Keep your payments in check.</p>
+                        </div>
+
+                        <button class="text-button" data-go-page="bills">
+                            View all
+                            <i data-lucide="arrow-right"></i>
+                        </button>
+                    </div>
+
+                    <div id="overviewPayments" class="preview-list"></div>
+
+                </div>
+
+            </div>
+
+
+            <!-- QUICK ACCESS -->
+            <div class="quick-access-section">
+
+                <div class="section-heading">
+                    <div>
+                        <h3>Quick access</h3>
+                        <p>Jump straight into your workspace.</p>
+                    </div>
+                </div>
+
+                <div class="quick-grid">
+
+                    <button class="quick-card quick-purple" data-go-page="tasks">
+                        <i data-lucide="check-circle-2"></i>
+                        <span>Manage tasks</span>
+                        <i data-lucide="arrow-up-right" class="quick-arrow"></i>
+                    </button>
+
+                    <button class="quick-card quick-pink" data-go-page="subscriptions">
+                        <i data-lucide="repeat"></i>
+                        <span>Subscriptions</span>
+                        <i data-lucide="arrow-up-right" class="quick-arrow"></i>
+                    </button>
+
+                    <button class="quick-card quick-blue" data-go-page="bills">
+                        <i data-lucide="receipt"></i>
+                        <span>Track bills</span>
+                        <i data-lucide="arrow-up-right" class="quick-arrow"></i>
+                    </button>
+
+                    <button class="quick-card quick-green" data-go-page="calendar">
+                        <i data-lucide="calendar-days"></i>
+                        <span>Open calendar</span>
+                        <i data-lucide="arrow-up-right" class="quick-arrow"></i>
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ========================= -->
+        <!-- TASKS PAGE -->
+        <!-- ========================= -->
+
+        <section class="page-view" id="view-tasks">
+
+            <div class="content-card page-card">
+
+                <div class="section-heading">
+                    <div>
+                        <h3>Your task list</h3>
+                        <p>Plan your day and get things done.</p>
+                    </div>
+
+                    <button class="primary-button" id="showTaskForm">
+                        <i data-lucide="plus"></i>
+                        Add task
+                    </button>
+                </div>
+
+
+                <!-- ADD TASK FORM -->
+                <form id="taskForm" class="entry-form hidden">
+
+                    <input type="hidden" id="taskEditId">
+
+                    <h4 id="taskFormTitle">Create a new task</h4>
+
+                    <div class="form-grid">
+
+                        <div class="form-group full-width">
+                            <label for="taskName">Task name</label>
+                            <input
+                                type="text"
+                                id="taskName"
+                                placeholder="What do you need to do?"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="taskDate">Due date</label>
+                            <input type="date" id="taskDate">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="taskPriority">Priority</label>
+                            <select id="taskPriority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="primary-button" id="taskSubmit">
+                            Save task
+                        </button>
+
+                        <button type="button" class="secondary-button" id="cancelTaskEdit">
+                            Cancel
+                        </button>
+                    </div>
+
+                </form>
+
+
+                <div id="taskList" class="item-list"></div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ========================= -->
+        <!-- SUBSCRIPTIONS PAGE -->
+        <!-- ========================= -->
+
+        <section class="page-view" id="view-subscriptions">
+
+            <div class="content-card page-card">
+
+                <div class="section-heading">
+                    <div>
+                        <h3>Your subscriptions</h3>
+                        <p>Keep track of your recurring expenses.</p>
+                    </div>
+
+                    <button class="primary-button" id="showSubscriptionForm">
+                        <i data-lucide="plus"></i>
+                        Add subscription
+                    </button>
+                </div>
+
+
+                <!-- ADD SUBSCRIPTION FORM -->
+                <form id="subscriptionForm" class="entry-form hidden">
+
+                    <input type="hidden" id="subscriptionEditId">
+
+                    <h4 id="subscriptionFormTitle">Add a subscription</h4>
+
+                    <div class="form-grid">
+
+                        <div class="form-group full-width">
+                            <label for="subscriptionName">Service name</label>
+                            <input
+                                type="text"
+                                id="subscriptionName"
+                                placeholder="e.g. Spotify, Netflix"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="subscriptionAmount">Amount (₹)</label>
+                            <input
+                                type="number"
+                                id="subscriptionAmount"
+                                min="0"
+                                step="0.01"
+                                placeholder="499"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="subscriptionCycle">Billing cycle</label>
+                            <select id="subscriptionCycle">
+                                <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label for="subscriptionDate">Next renewal date</label>
+                            <input type="date" id="subscriptionDate" required>
+                        </div>
+
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="primary-button" id="subscriptionSubmit">
+                            Save subscription
+                        </button>
+
+                        <button type="button" class="secondary-button" id="cancelSubscriptionEdit">
+                            Cancel
+                        </button>
+                    </div>
+
+                </form>
+
+
+                <div id="subscriptionList" class="item-list"></div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ========================= -->
+        <!-- BILLS PAGE -->
+        <!-- ========================= -->
+
+        <section class="page-view" id="view-bills">
+
+            <div class="content-card page-card">
+
+                <div class="section-heading">
+                    <div>
+                        <h3>Your bills</h3>
+                        <p>Never lose track of a payment.</p>
+                    </div>
+
+                    <button class="primary-button" id="showBillForm">
+                        <i data-lucide="plus"></i>
+                        Add bill
+                    </button>
+                </div>
+
+
+                <!-- ADD BILL FORM -->
+                <form id="billForm" class="entry-form hidden">
+
+                    <input type="hidden" id="billEditId">
+
+                    <h4 id="billFormTitle">Add a new bill</h4>
+
+                    <div class="form-grid">
+
+                        <div class="form-group full-width">
+                            <label for="billName">Bill name</label>
+                            <input
+                                type="text"
+                                id="billName"
+                                placeholder="e.g. Electricity, Wi-Fi"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="billAmount">Amount (₹)</label>
+                            <input
+                                type="number"
+                                id="billAmount"
+                                min="0"
+                                step="0.01"
+                                placeholder="1200"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="billDate">Due date</label>
+                            <input type="date" id="billDate" required>
+                        </div>
+
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="primary-button" id="billSubmit">
+                            Save bill
+                        </button>
+
+                        <button type="button" class="secondary-button" id="cancelBillEdit">
+                            Cancel
+                        </button>
+                    </div>
+
+                </form>
+
+
+                <div id="billList" class="item-list"></div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ========================= -->
+        <!-- CALENDAR PAGE -->
+        <!-- ========================= -->
+
+        <section class="page-view" id="view-calendar">
+
+            <div class="content-card page-card">
+
+                <div class="section-heading">
+                    <div>
+                        <h3>Your upcoming schedule</h3>
+                        <p>Tasks, renewals and bills in one timeline.</p>
+                    </div>
+                </div>
+
+                <div id="calendarList" class="calendar-list"></div>
+
+            </div>
+
+        </section>
+
+
+        <!-- FOOTER -->
+        <footer class="main-footer">
+            <p>Made for a more organised everyday. <span>✦</span> ORBIT</p>
+            <p>Your information is saved in this browser.</p>
+        </footer>
+
+    </main>
+
+</div>
+
+
+<!-- TOAST MESSAGE -->
+<div id="toast" class="toast"></div>
+
+
+<script src="app.js"></script>
+
+</body>
+</html>
